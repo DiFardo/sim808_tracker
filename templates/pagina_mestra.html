@@ -1,0 +1,32 @@
+<!DOCTYPE html>
+<html lang="es">
+
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
+
+    <!-- Bootstrap 5 CSS -->
+    {% block link %}
+    
+    {% endblock %}
+</head>
+
+
+    <!-- Navbar -->
+    {% block navbar %}
+    {% include 'navbar.html' %}
+    {% endblock %}
+    <!-- End Navbar -->
+
+    <!-- Main Content -->
+
+        {% block contenido %}
+        {% endblock %}
+
+    <!-- End Main Content -->
+
+    <!-- Bootstrap 5 JS -->
+    <script src="{{ url_for('static', filename='js/bootstrap.bundle.min.js') }}"></script>
+</body>
+
+</html>
