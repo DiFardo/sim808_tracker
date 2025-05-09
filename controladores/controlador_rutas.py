@@ -1,31 +1,28 @@
 from bd_conexion import obtener_conexion
 
-def registrar_ruta_y_asignacion(id_persona, id_vehiculo, destino_lat, destino_lon, destino_direccion, fecha, hora_salida):
+def registrar_ruta_y_asignacion(id_persona, id_vehiculo, destino_lat, destino_lon, destino, fecha, hora_salida):
     conexion = obtener_conexion()
     try:
-        # Validación simple
-        if not destino_lat or not destino_lon:
-            return False, "Debe seleccionar un destino válido con coordenadas.", None
+        if not destino_lat or not destino_lon or not destino:
+            return False, "Faltan campos requeridos", None
 
         with conexion.cursor() as cursor:
-            # Insertar ruta SIN origen; solo destino por ahora
             cursor.execute("""
                 INSERT INTO rutas_programadas (
-                    destino_lat, destino_lon, destino_direccion,
+                    destino, destino_lat, destino_lon,
                     fecha, hora_salida
                 )
                 VALUES (%s, %s, %s, %s, %s)
                 RETURNING id;
-            """, (destino_lat, destino_lon, destino_direccion, fecha, hora_salida))
+            """, (destino, destino_lat, destino_lon, fecha, hora_salida))
+            
             id_ruta = cursor.fetchone()[0]
 
-            # Insertar asignación de conductor y vehículo
             cursor.execute("""
                 INSERT INTO asignacion_ruta_conductor (id_persona, id_vehiculo, id_ruta)
                 VALUES (%s, %s, %s);
             """, (id_persona, id_vehiculo, id_ruta))
 
-            # Marcar el vehículo como ocupado
             cursor.execute("UPDATE vehiculos SET estado = FALSE WHERE id = %s;", (id_vehiculo,))
 
         conexion.commit()
@@ -35,6 +32,7 @@ def registrar_ruta_y_asignacion(id_persona, id_vehiculo, destino_lat, destino_lo
         return False, str(e), None
     finally:
         conexion.close()
+
 
 
 

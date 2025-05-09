@@ -353,6 +353,14 @@
   });
 </script>
 <script>
+  const inputDestino = document.getElementById("destino_input");
+
+const direccionCorta = inputDestino.getAttribute("data-corta");
+const direccionCompleta = inputDestino.getAttribute("data-completa");
+
+formData.append("destino", direccionCorta);
+formData.append("destino_direccion", direccionCompleta);
+
   let mapaDestino, marcadorDestino;
   let geocoder;
 
@@ -360,7 +368,6 @@
     const chiclayo = { lat: -6.7714, lng: -79.8409 };
     geocoder = new google.maps.Geocoder();
 
-    // DESTINO
     mapaDestino = new google.maps.Map(document.getElementById("mapa_destino"), {
       center: chiclayo,
       zoom: 14
@@ -373,6 +380,8 @@
     });
 
     const inputDestino = document.getElementById("destino_input");
+    const inputCoords = document.getElementById("destino_coords");
+
     const autocompleteDestino = new google.maps.places.Autocomplete(inputDestino, {
       fields: ["geometry", "formatted_address"],
       componentRestrictions: { country: "pe" }
@@ -381,28 +390,46 @@
     autocompleteDestino.addListener("place_changed", function () {
       const place = autocompleteDestino.getPlace();
       if (!place.geometry) return;
+
       const loc = place.geometry.location;
+      const direccionCompleta = place.formatted_address;
+      const direccionCorta = direccionCompleta.split(",")[0]; // ej: "Av. Grau Y"
+
       mapaDestino.setCenter(loc);
       marcadorDestino.setPosition(loc);
-      document.getElementById("destino_coords").value = `${loc.lat()},${loc.lng()}`;
-      inputDestino.value = place.formatted_address;
+
+      // Guardar coordenadas y dirección
+      inputCoords.value = `${loc.lat()},${loc.lng()}`;
+      inputDestino.value = direccionCompleta;
+
+      // Guardar como atributos adicionales si deseas usarlos en el submit
+      inputDestino.setAttribute("data-corta", direccionCorta);
+      inputDestino.setAttribute("data-completa", direccionCompleta);
     });
 
     mapaDestino.addListener("click", function (e) {
-      marcadorDestino.setPosition(e.latLng);
-      document.getElementById("destino_coords").value = `${e.latLng.lat()},${e.latLng.lng()}`;
-      geocodeLatLng(e.latLng, "destino_input");
+      const latlng = e.latLng;
+      marcadorDestino.setPosition(latlng);
+      inputCoords.value = `${latlng.lat()},${latlng.lng()}`;
+      geocodeLatLng(latlng, "destino_input");
     });
   }
 
   function geocodeLatLng(latlng, inputId) {
     geocoder.geocode({ location: latlng }, (results, status) => {
       if (status === "OK" && results[0]) {
-        document.getElementById(inputId).value = results[0].formatted_address;
+        const direccionCompleta = results[0].formatted_address;
+        const direccionCorta = direccionCompleta.split(",")[0];
+        const input = document.getElementById(inputId);
+
+        input.value = direccionCompleta;
+        input.setAttribute("data-corta", direccionCorta);
+        input.setAttribute("data-completa", direccionCompleta);
       }
     });
   }
 </script>
+
 
 
 

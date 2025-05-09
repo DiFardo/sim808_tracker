@@ -300,28 +300,32 @@ def api_asignar_ruta():
 
         id_persona = int(data.get("conductor"))
         id_vehiculo = int(data.get("vehiculo"))
-        destino = data.get("destino")  # dirección textual
-        destino_coords = data.get("destino_coords")  # formato: lat,lon
+        destino_direccion = data.get("destino")  # dirección completa (del input)
+        destino_coords = data.get("destino_coords")  # formato: "lat,lon"
         fecha = data.get("fecha")
         hora_salida = data.get("hora_salida")
 
-        # Validación de campos obligatorios
-        if not all([id_persona, id_vehiculo, destino, destino_coords, fecha, hora_salida]):
+        # Validar campos obligatorios
+        if not all([id_persona, id_vehiculo, destino_direccion, destino_coords, fecha, hora_salida]):
             return jsonify({"success": False, "message": "Faltan campos requeridos"}), 400
 
-        # Separar lat y lon del destino
+        # Separar lat y lon
         try:
             destino_lat, destino_lon = map(float, destino_coords.split(","))
         except Exception:
             return jsonify({"success": False, "message": "Coordenadas de destino inválidas"}), 400
 
-        # Llamar a la función del controlador
+        # Extraer una dirección corta para el campo 'destino'
+        destino = destino_direccion.split(",")[0]  # ejemplo: "Av. Grau Y"
+
+        # Registrar la ruta
         success, msg, _ = controlador_rutas.registrar_ruta_y_asignacion(
             id_persona=id_persona,
             id_vehiculo=id_vehiculo,
+            destino=destino,
+            destino_direccion=destino_direccion,
             destino_lat=destino_lat,
             destino_lon=destino_lon,
-            destino_direccion=destino,
             fecha=fecha,
             hora_salida=hora_salida
         )
@@ -333,6 +337,7 @@ def api_asignar_ruta():
 
     except Exception as e:
         return jsonify({"success": False, "message": f"Error: {str(e)}"}), 500
+
 
 @app.route("/api/ruta-actual", methods=["GET"])
 def obtener_ruta_actual():
