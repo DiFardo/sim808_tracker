@@ -363,15 +363,15 @@ def obtener_ruta_actual():
 @app.route("/api/registrar_origen_gps", methods=["POST"])
 def registrar_origen_gps():
     data = request.get_json()
-    print("Payload recibido:", data)  # <-- AGREGAR ESTO
-    id_ruta = data.get("id_ruta")
-    lat = data.get("lat")
-    lon = data.get("lon")
+    print("📦 Payload recibido:", data)
 
-    if not all([id_ruta, lat, lon]):
-        return jsonify({"error": "Datos incompletos"}), 400
+    try:
+        id_ruta = int(data.get("id_ruta"))       # <- convertir a entero
+        lat = float(data.get("lat"))             # <- convertir a decimal
+        lon = float(data.get("lon"))
+    except (TypeError, ValueError):
+        return jsonify({"error": "Datos inválidos"}), 400
 
-    # Puedes usar geopy para traducir coordenadas a texto (opcional)
     direccion = f"Lat: {lat}, Lon: {lon}"
 
     conexion = obtener_conexion()
@@ -385,9 +385,11 @@ def registrar_origen_gps():
                 WHERE id = %s;
             """, (direccion, lat, lon, id_ruta))
         conexion.commit()
+        print(f"✅ Ruta {id_ruta} actualizada correctamente.")
         return jsonify({"success": True, "message": "Origen actualizado"}), 200
     except Exception as e:
         conexion.rollback()
+        print("❌ Error al actualizar:", str(e))
         return jsonify({"success": False, "message": str(e)}), 500
     finally:
         conexion.close()
