@@ -10,8 +10,6 @@
     
     {% endblock %}
 </head>
-
-
     <!-- Navbar -->
     {% block navbar %}
     {% include 'navbar.html' %}
@@ -23,10 +21,14 @@
         {% block contenido %}
         {% endblock %}
 
-    <!-- End Main Content -->
 
-    <!-- Bootstrap 5 JS -->
+        {% block script %}
+        {% endblock %}
+
     <script src="{{ url_for('static', filename='js/bootstrap.bundle.min.js') }}"></script>
+    <script src="/static/js/app.js"></script>
+
+   
 </body>
 
 </html>

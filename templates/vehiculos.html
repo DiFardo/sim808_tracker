@@ -1,0 +1,426 @@
+{% extends "pagina_maestra.html" %}
+
+{% block titulo %}Gestión de Vehículos{% endblock %}
+
+{% block link %}
+<!-- Font Awesome for icons -->
+<link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css" rel="stylesheet">
+<link href="{{ url_for('static', filename='css/custom.css') }}" rel="stylesheet">
+<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+<link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
+<link rel="stylesheet" href="{{ url_for('static', filename='css/app.css') }}">
+{% endblock %}
+
+{% block contenido %}
+<style>
+  #productos .card-product {
+    border: 1px solid #ddd;
+    border-radius: 8px;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+    text-align: center;
+    padding: 1rem;
+    background-color: #fff;
+    position: relative;
+    transition: all 0.3s ease-in-out;
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+  }
+
+  #productos .card-product:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+  }
+
+  #productos .card-product img {
+    width: 100%;
+    height: 200px;
+    object-fit: cover;
+    border-radius: 8px;
+    margin-bottom: 10px;
+  }
+
+  #productos .card-product h5 {
+    font-size: 0.95rem;
+    color: #333;
+    margin: 0;
+    margin-bottom: 0.5rem;
+  }
+
+  #productos .card-product .placa {
+    font-weight: bold;
+    font-size: 0.85rem;
+  }
+
+  #productos .card-product .estado {
+    font-size: 0.7rem;
+    font-weight: 600;
+    color: #ffffff;
+    background-color: #28a745;
+    display: inline-block;
+    padding: 0.2rem 0.5rem;
+    border-radius: 10px;
+    margin-top: 0.25rem;
+  }
+
+  #productos .card-product .estado.inactivo {
+    background-color: #dc3545;
+  }
+
+  .edit-icon,
+  .delete-icon {
+    position: absolute;
+    top: 5px;
+    right: 5px;
+    border-radius: 50%;
+    padding: 5px;
+    cursor: pointer;
+    font-size: 18px;
+    display: none;
+    z-index: 2;
+  }
+
+  .edit-icon {
+    position: absolute;
+    top: 8px;
+    right: 8px;
+    background-color: rgba(255, 255, 255, 0.85);
+    color: #6c757d;
+    border-radius: 50%;
+    padding: 5px;
+    cursor: pointer;
+    font-size: 18px;
+    display: none;
+    z-index: 10;
+    transition: all 0.2s ease;
+  }
+
+  .edit-icon:hover {
+    background-color: #0d6efd;
+    color: #fff;
+  }
+
+  .delete-icon {
+    background-color: #dc3545;
+    color: white;
+  }
+
+  .delete-icon:hover {
+    background-color: #c82333;
+  }
+
+  .table-title {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 1rem;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 1.5rem;
+    z-index: 10;
+  }
+</style>
+<div id="content">
+  <div class="main-content">
+    <!-- Breadcrumb dinámico -->
+    <nav aria-label="breadcrumb" class="mb-3">
+      <ol class="breadcrumb">
+        {% for crumb in breadcrumbs %}
+        {% if loop.last %}
+        <li class="breadcrumb-item active" aria-current="page">{{ crumb.name }}</li>
+        {% else %}
+        <li class="breadcrumb-item"><a href="{{ crumb.url }}">{{ crumb.name }}</a></li>
+        {% endif %}
+        {% endfor %}
+      </ol>
+    </nav>
+    <div class="table-title">
+      <div class="input-group">
+        <input type="text" class="form-control" placeholder="Buscar vehículos...">
+        <button class="btn btn-outline-secondary" type="button">
+          <i class="fas fa-search"></i>
+        </button>
+      </div>
+      <div class="btn-group">
+        <button class="btn btn-success btn-sm" data-bs-toggle="modal" data-bs-target="#modalVehiculo">
+          <i class="material-icons">add</i> Nuevo Vehículo
+        </button>
+        <button class="btn btn-primary btn-sm" id="btnToggleEdicion">
+          <i class="material-icons">edit</i> <span id="textoEdicion">Editar</span>
+        </button>
+
+
+        <button class="btn btn-danger btn-sm" id="btnToggleEliminar">
+          <i class="material-icons">delete</i> <span id="textoEliminar">Eliminar</span>
+        </button>
+        
+      </div>
+    </div>
+
+    <div class="row" id="productos">
+      {% for vehiculo in vehiculos %}
+      <div class="col-lg-3 col-md-4 col-sm-6 col-12 mb-4">
+        <div class="card-product h-100">
+          <div class="edit-icon" onclick="abrirEditarVehiculo({{ vehiculo.id }})">
+            <i class="material-icons">edit</i>
+          </div>
+          <div class="delete-icon" onclick="eliminarVehiculo({{ vehiculo.id }})">
+            <i class="material-icons">close</i>
+          </div>
+          
+          <img src="{{ vehiculo.imagen or url_for('static', filename='img/vehiculos/default.png') }}"
+            alt="{{ vehiculo.placa }}">
+          <h5>{{ vehiculo.modelo }}</h5>
+          <span class="placa">Placa: {{ vehiculo.placa }}</span>
+          <span class="estado {% if not vehiculo.estado %}inactivo{% endif %}">
+            {% if vehiculo.estado %}Activo{% else %}Inactivo{% endif %}
+          </span>
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+</div>
+
+<!-- Modal para nuevo vehículo -->
+<div class="modal fade" id="modalVehiculo" tabindex="-1" aria-labelledby="modalVehiculoLabel" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered modal-lg">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="modalVehiculoLabel">Nuevo Vehículo</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button>
+      </div>
+      <form id="formVehiculo" enctype="multipart/form-data">
+        <div class="modal-body">
+          <div class="row">
+            <div class="col-md-6">
+              <div class="mb-3">
+                <label for="placa" class="form-label">Placa</label>
+                <input type="text" class="form-control" id="placa" name="placa" required>
+              </div>
+              <div class="mb-3">
+                <label for="marca" class="form-label">Marca</label>
+                <input type="text" class="form-control" id="marca" name="marca" required>
+              </div>
+              <div class="mb-3">
+                <label for="modelo" class="form-label">Modelo</label>
+                <input type="text" class="form-control" id="modelo" name="modelo" required>
+              </div>
+              <div class="mb-3">
+                <label for="anio" class="form-label">Año</label>
+                <input type="number" class="form-control" id="anio" name="anio" min="1900" max="2099" required>
+              </div>
+              <div class="mb-3">
+                <label for="estado" class="form-label">Estado</label>
+                <select class="form-select" id="estado" name="estado" required>
+                  <option value="true" selected>Activo</option>
+                  <option value="false">Inactivo</option>
+                </select>
+              </div>
+            </div>
+            <div class="col-md-6">
+              <div class="mb-3">
+                <label class="form-label">Vista Previa</label>
+                <div class="image-preview-box" id="preview-container">
+                  <span class="text-muted">Sin imagen</span>
+                </div>
+              </div>
+              <div class="mb-3">
+                <label for="imagen" class="form-label">Agregar Imagen</label>
+                <input type="file" class="form-control" id="imagen" name="imagen" accept="image/*">
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="submit" class="btn btn-success w-100" id="btnGuardarVehiculo" data-action="registrar">
+            Guardar Vehículo
+          </button>
+
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+<script>
+  document.getElementById("imagen").addEventListener("change", function (event) {
+    const container = document.getElementById("preview-container");
+    container.innerHTML = "";
+    const file = event.target.files[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onload = function (e) {
+        const img = document.createElement("img");
+        img.src = e.target.result;
+        container.appendChild(img);
+      };
+      reader.readAsDataURL(file);
+    }
+  });
+</script>
+<script>
+  let idVehiculoEdicion = null;
+
+  function abrirEditarVehiculo(id) {
+    document.getElementById("modalVehiculoLabel").textContent = "Editar Vehículo";
+    document.getElementById("btnGuardarVehiculo").textContent = "Actualizar Vehículo";
+    document.getElementById("btnGuardarVehiculo").setAttribute("data-action", "editar");
+    idVehiculoEdicion = id;
+
+    document.getElementById("preview-container").innerHTML = "";
+
+    fetch(`/api/vehiculo/${id}`)
+      .then(response => response.json())
+      .then(data => {
+        document.getElementById("placa").value = data.placa;
+        document.getElementById("marca").value = data.marca;
+        document.getElementById("modelo").value = data.modelo;
+        document.getElementById("anio").value = data.anio;
+        document.getElementById("estado").value = data.estado ? "true" : "false";
+
+        if (data.imagen) {
+          const img = document.createElement("img");
+          img.src = "/" + data.imagen;
+          img.alt = "Vista previa";
+          img.style.maxWidth = "100%";
+          document.getElementById("preview-container").appendChild(img);
+        }
+
+        const modal = new bootstrap.Modal(document.getElementById("modalVehiculo"));
+        modal.show();
+      })
+      .catch(err => {
+        console.error("Error al cargar datos del vehículo:", err);
+        alert("No se pudo cargar la información del vehículo.");
+      });
+  }
+
+  document.getElementById("formVehiculo").addEventListener("submit", async function (e) {
+    e.preventDefault();
+
+    const accion = document.getElementById("btnGuardarVehiculo").getAttribute("data-action");
+    const form = document.getElementById("formVehiculo");
+    const formData = new FormData(form);
+
+    const url = (accion === "editar" && idVehiculoEdicion)
+      ? `/api/vehiculo/${idVehiculoEdicion}`
+      : `/api/vehiculo/registrar`;
+
+    const method = (accion === "editar") ? "PUT" : "POST";
+
+    try {
+      const response = await fetch(url, {
+        method: method,
+        body: formData
+      });
+
+      const data = await response.json();
+
+      if (data.success || response.ok) {
+        alert(accion === "editar" ? "Vehículo actualizado correctamente." : "Vehículo registrado correctamente.");
+        location.reload();
+      } else {
+        alert("Error: " + data.message);
+      }
+
+    } catch (error) {
+      console.error("Error en la solicitud:", error);
+      alert("Error al conectar con el servidor.");
+    }
+  });
+
+  document.getElementById("modalVehiculo").addEventListener("hidden.bs.modal", function () {
+    document.getElementById("formVehiculo").reset();
+    document.getElementById("preview-container").innerHTML = "<span class='text-muted'>Sin imagen</span>";
+    document.getElementById("modalVehiculoLabel").textContent = "Nuevo Vehículo";
+    document.getElementById("btnGuardarVehiculo").textContent = "Guardar Vehículo";
+    document.getElementById("btnGuardarVehiculo").setAttribute("data-action", "registrar");
+    idVehiculoEdicion = null;
+  });
+</script>
+
+
+<script>
+  let modoEdicionActivo = false;
+
+  document.getElementById("btnToggleEdicion").addEventListener("click", function () {
+    modoEdicionActivo = !modoEdicionActivo;
+
+    const editIcons = document.querySelectorAll(".edit-icon");
+    const textoBoton = document.getElementById("textoEdicion");
+
+    editIcons.forEach(icon => {
+      icon.style.display = modoEdicionActivo ? "inline-block" : "none";
+    });
+
+    // Cambiar texto y color del botón
+    if (modoEdicionActivo) {
+      textoBoton.textContent = "Cancelar";
+      this.classList.remove("btn-primary");
+      this.classList.add("btn-outline-secondary");
+    } else {
+      textoBoton.textContent = "Editar";
+      this.classList.remove("btn-outline-secondary");
+      this.classList.add("btn-primary");
+    }
+  });
+</script>
+<script>
+  document.getElementById("modalVehiculo").addEventListener("hidden.bs.modal", function () {
+    document.getElementById("formVehiculo").reset();
+    document.getElementById("preview-container").innerHTML = "<span class='text-muted'>Sin imagen</span>";
+    document.getElementById("modalVehiculoLabel").textContent = "Nuevo Vehículo";
+    idVehiculoEdicion = null;
+  });
+</script>
+<script>
+  let modoEliminarActivo = false;
+  
+  document.getElementById("btnToggleEliminar").addEventListener("click", function () {
+    modoEliminarActivo = !modoEliminarActivo;
+  
+    const deleteIcons = document.querySelectorAll(".delete-icon");
+    const textoBoton = document.getElementById("textoEliminar");
+  
+    deleteIcons.forEach(icon => {
+      icon.style.display = modoEliminarActivo ? "inline-block" : "none";
+    });
+  
+    // Cambiar texto y color del botón
+    if (modoEliminarActivo) {
+      textoBoton.textContent = "Cancelar";
+      this.classList.remove("btn-danger");
+      this.classList.add("btn-outline-secondary");
+    } else {
+      textoBoton.textContent = "Eliminar";
+      this.classList.remove("btn-outline-secondary");
+      this.classList.add("btn-danger");
+    }
+  });
+  </script>
+  
+  <script>
+    function eliminarVehiculo(id) {
+      if (!confirm("¿Estás seguro de que deseas eliminar este vehículo?")) return;
+    
+      fetch(`/api/vehiculo/${id}`, {
+        method: "DELETE"
+      })
+        .then(response => response.json())
+        .then(data => {
+          if (data.success) {
+            alert("Vehículo eliminado correctamente.");
+            location.reload();
+          } else {
+            alert("Error al eliminar vehículo: " + data.message);
+          }
+        })
+        .catch(err => {
+          console.error("Error al eliminar vehículo:", err);
+          alert("No se pudo conectar con el servidor.");
+        });
+    }
+    </script>
+    
+
+{% endblock %}

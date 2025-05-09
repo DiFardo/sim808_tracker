@@ -1,0 +1,480 @@
+{% extends "pagina_maestra.html" %}
+
+{% block titulo %}Admin Panel{% endblock %}
+
+{% block link %}
+<link rel="stylesheet" href="{{ url_for('static', filename='css/app.css') }}">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600&display=swap">
+<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+<link rel="stylesheet" href="{{ url_for('static', filename='css/custom.css') }}">
+<link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css" rel="stylesheet">
+<link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
+
+<style>
+    table thead.table-dark th {
+        background-color: #343a40;
+        color: #ffffff;
+        font-weight: 600;
+    }
+
+    table tbody tr {
+        transition: background-color 0.2s;
+    }
+
+    table tbody tr:hover {
+        background-color: #f5f5f5;
+    }
+
+    table td,
+    table th {
+        vertical-align: middle;
+    }
+
+    .btn-primary {
+        background-color: #198754;
+        border-color: #198754;
+    }
+
+    .btn-primary:hover {
+        background-color: #157347;
+        border-color: #146c43;
+    }
+
+    .modal-content {
+        border-radius: 1rem;
+    }
+
+    .switch {
+        position: relative;
+        display: inline-block;
+        width: 40px;
+        height: 20px;
+    }
+
+    .switch input {
+        opacity: 0;
+        width: 0;
+        height: 0;
+    }
+
+    .slider {
+        position: absolute;
+        cursor: pointer;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background-color: #dc3545;
+        /* rojo por defecto (desactivado) */
+        transition: .4s;
+        border-radius: 34px;
+    }
+
+    .slider:before {
+        position: absolute;
+        content: "";
+        height: 14px;
+        width: 14px;
+        left: 3px;
+        bottom: 3px;
+        background-color: white;
+        transition: .4s;
+        border-radius: 50%;
+    }
+
+    input:checked+.slider {
+        background-color: #198754;
+        /* verde cuando está activo */
+    }
+
+    input:checked+.slider:before {
+        transform: translateX(20px);
+    }
+
+
+    .acciones i {
+        font-size: 18px;
+        cursor: pointer;
+        margin-right: 8px;
+    }
+
+    .acciones i.text-danger:hover {
+        color: #dc3545;
+    }
+
+    .acciones i.text-primary:hover {
+        color: #0d6efd;
+    }
+</style>
+{% endblock %}
+
+{% block contenido %}
+<div id="content">
+    <div class="main-content">
+        <!-- Breadcrumb dinámico -->
+        <nav aria-label="breadcrumb">
+            <ol class="breadcrumb">
+                {% for crumb in breadcrumbs %}
+                {% if loop.last %}
+                <li class="breadcrumb-item active" aria-current="page">{{ crumb.name }}</li>
+                {% else %}
+                <li class="breadcrumb-item"><a href="{{ crumb.url }}">{{ crumb.name }}</a></li>
+                {% endif %}
+                {% endfor %}
+            </ol>
+        </nav>
+
+        <div class="row">
+            <div class="col-12">
+                <div class="card flex-fill mb-4">
+                    <div class="card-header d-flex justify-content-between align-items-center">
+                        <h5 class="card-title mb-0">Usuarios</h5>
+                        <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#modalCrearUsuario">+
+                            Añadir</button>
+                    </div>
+                    <div class="card-body">
+                        <ul class="nav nav-tabs mb-3" id="usuario-tabs" role="tablist">
+                            <li class="nav-item" role="presentation">
+                                <button class="nav-link active" id="admin-tab" data-bs-toggle="tab"
+                                    data-bs-target="#admin" type="button" role="tab">Administrador</button>
+                            </li>
+                            <li class="nav-item" role="presentation">
+                                <button class="nav-link" id="conductor-tab" data-bs-toggle="tab"
+                                    data-bs-target="#conductor" type="button" role="tab">Conductores</button>
+                            </li>
+                        </ul>
+
+                        <div class="tab-content" id="usuario-tabs-content">
+                            <!-- ADMINISTRADORES -->
+                            <div class="tab-pane fade show active" id="admin" role="tabpanel">
+                                <div class="table-responsive">
+                                    <table class="table table-hover table-bordered">
+                                        <thead class="table-dark">
+                                            <tr>
+                                                <th>DNI</th>
+                                                <th>Nombre</th>
+                                                <th>Apellido</th>
+                                                <th>Rol</th>
+                                                <th>Estado</th>
+                                                <th class="text-center">Acciones</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            {% for u in usuarios_admin %}
+                                            <tr>
+                                                <td>{{ u.dni }}</td>
+                                                <td>{{ u.nombre }}</td>
+                                                <td>{{ u.apellido }}</td>
+                                                <td>{{ u.rol }}</td>
+                                                <td class="text-center">
+                                                    <label class="switch">
+                                                        <input type="checkbox" {% if u.estado=='Activo' %}checked{%
+                                                            endif %} data-id="{{ u.id }}"
+                                                            onchange="cambiarEstadoUsuario(this)">
+                                                        <span class="slider"></span>
+                                                    </label>
+                                                </td>
+                                                <td class="acciones text-center">
+                                                    <i class="material-icons text-primary" title="Editar"
+                                                        onclick="editarUsuario('{{ u.id }}')">edit</i>
+                                                    <i class="material-icons text-danger" title="Eliminar"
+                                                        onclick="eliminarUsuario('{{ u.id }}')">delete</i>
+                                                </td>
+                                            </tr>
+                                            {% endfor %}
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+
+                            <!-- CONDUCTORES -->
+                            <div class="tab-pane fade" id="conductor" role="tabpanel">
+                                <div class="table-responsive">
+                                    <table class="table table-hover table-bordered">
+                                        <thead class="table-dark">
+                                            <tr>
+                                                <th>DNI</th>
+                                                <th>Nombre</th>
+                                                <th>Apellido</th>
+                                                <th>Rol</th>
+                                                <th>Estado</th>
+                                                <th class="text-center">Acciones</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            {% for u in usuarios_conductor %}
+                                            <tr>
+                                                <td>{{ u.dni }}</td>
+                                                <td>{{ u.nombre }}</td>
+                                                <td>{{ u.apellido }}</td>
+                                                <td>{{ u.rol }}</td>
+                                                <td class="text-center">
+                                                    <label class="switch">
+                                                        <input type="checkbox" {% if u.estado=='Activo' %}checked{%
+                                                            endif %} data-id="{{ u.id }}"
+                                                            onchange="cambiarEstadoUsuario(this)">
+                                                        <span class="slider"></span>
+                                                    </label>
+                                                </td>
+
+
+
+                                                <td class="acciones text-center">
+                                                    <i class="material-icons text-primary" title="Editar"
+                                                        onclick="editarUsuario('{{ u.id }}')">edit</i>
+                                                    <i class="material-icons text-danger" title="Eliminar"
+                                                        onclick="eliminarUsuario('{{ u.id }}')">delete</i>
+                                                </td>
+                                            </tr>
+                                            {% endfor %}
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+
+        <div class="modal fade" id="modalCrearUsuario" tabindex="-1" aria-labelledby="modalCrearUsuarioLabel"
+            aria-hidden="true">
+            <div class="modal-dialog modal-dialog-centered modal-lg">
+                <div class="modal-content shadow">
+                    <div class="modal-header border-0">
+                        <h5 class="modal-title fw-bold" id="modalCrearUsuarioLabel">Crear usuario</h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button>
+                    </div>
+                    <div class="modal-body px-4">
+                        <form id="formCrearUsuario">
+                            <div class="row g-3">
+                                <div class="col-md-6">
+                                    <label for="nombreUsuario" class="form-label">Nombre</label>
+                                    <input type="text" class="form-control" id="nombreUsuario" required>
+                                </div>
+                                <div class="col-md-6">
+                                    <label for="apellidosUsuario" class="form-label">Apellidos</label>
+                                    <input type="text" class="form-control" id="apellidosUsuario" required>
+                                </div>
+                                <div class="col-md-6">
+                                    <label for="dniUsuario" class="form-label">DNI</label>
+                                    <input type="text" class="form-control" id="dniUsuario" maxlength="8" required>
+                                </div>
+                                <div class="col-md-6">
+                                    <label for="passUsuario" class="form-label">Contraseña</label>
+                                    <input type="password" class="form-control" id="passUsuario" required>
+                                </div>
+                                <div class="col-md-6">
+                                    <label for="rolUsuario" class="form-label">Rol</label>
+                                    <select class="form-select" id="rolUsuario" required>
+                                        <option value="">Seleccionar rol</option>
+                                        <option value="1">Administrador</option>
+                                        <option value="2">Conductor</option>
+                                    </select>
+                                </div>
+                                <div class="col-md-6">
+                                    <label for="estadoUsuario" class="form-label">Estado</label>
+                                    <select class="form-select" id="estadoUsuario" required>
+                                        <option value="activo">Activo</option>
+                                        <option value="inactivo">Inactivo</option>
+                                    </select>
+                                </div>
+                            </div>
+                            <div class="mt-4 d-flex justify-content-end">
+                                <button type="button" class="btn btn-secondary me-2"
+                                    data-bs-dismiss="modal">Cancelar</button>
+                                <button type="submit" class="btn btn-primary" id="btnGuardarUsuario"
+                                    data-action="registrar">Guardar</button>
+
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+    </div>
+</div>
+
+<script>
+    function cambiarEstadoUsuario(checkbox) {
+        const idUsuario = checkbox.getAttribute("data-id");
+        const nuevoEstado = checkbox.checked ? 'activo' : 'inactivo';
+
+        fetch(`/usuarios/${idUsuario}/estado`, {
+            method: 'PUT',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({ estado: nuevoEstado })
+        })
+            .then(response => {
+                if (!response.ok) throw new Error('Error al cambiar estado');
+            })
+            .catch(error => {
+                alert("No se pudo cambiar el estado.");
+                checkbox.checked = !checkbox.checked;
+            });
+    }
+</script>
+<!-- AÑADIR USUARIO-->
+
+<script>
+    document.getElementById("formCrearUsuario").addEventListener("submit", function (e) {
+        e.preventDefault();
+
+        const form = this;
+        const action = document.getElementById("btnGuardarUsuario").getAttribute("data-action");
+        const idUsuario = form.getAttribute("data-id") || null;
+
+        const nombre = document.getElementById("nombreUsuario").value.trim();
+        const apellido = document.getElementById("apellidosUsuario").value.trim();
+        const dni = document.getElementById("dniUsuario").value.trim();
+        const password = document.getElementById("passUsuario").value.trim();
+        const rol_id = document.getElementById("rolUsuario").value;
+        const estado = document.getElementById("estadoUsuario").value;
+
+        if (!nombre || !apellido || !dni || !rol_id || !estado || (action === "registrar" && !password)) {
+            alert("Por favor complete todos los campos.");
+            return;
+        }
+
+        const payload = {
+            nombre: nombre,
+            apellido: apellido,
+            dni: dni,
+            rol_id: rol_id,
+            estado: estado
+        };
+
+        if (password) {
+            payload.password = password;
+        }
+
+        const url = action === "editar" ? `/api/usuarios/${idUsuario}` : "/api/usuarios";
+        const method = action === "editar" ? "PUT" : "POST";
+
+        fetch(url, {
+            method: method,
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(payload)
+        })
+            .then(res => res.json())
+            .then(data => {
+                if (data.success) {
+                    alert(data.message);
+                    document.getElementById("formCrearUsuario").reset();
+                    const modal = bootstrap.Modal.getInstance(document.getElementById("modalCrearUsuario"));
+                    modal.hide();
+                    setTimeout(() => location.reload(), 1000);
+                } else {
+                    alert("Error: " + data.message);
+                }
+            })
+            .catch(err => {
+                console.error(err);
+                alert("Error al procesar la solicitud.");
+            });
+    });
+</script>
+
+<script>
+    function editarUsuario(id) {
+        fetch(`/api/usuarios/${id}`)
+            .then(res => res.json())
+            .then(data => {
+                document.getElementById("nombreUsuario").value = data.nombre;
+                document.getElementById("apellidosUsuario").value = data.apellido;
+                document.getElementById("dniUsuario").value = data.dni;
+                document.getElementById("rolUsuario").value = data.rol_id;
+                document.getElementById("estadoUsuario").value = data.estado ? 'activo' : 'inactivo';
+                document.getElementById("passUsuario").removeAttribute("required");
+
+                document.getElementById("modalCrearUsuarioLabel").textContent = "Editar usuario";
+
+
+
+                document.getElementById("formCrearUsuario").setAttribute("data-id", id);
+                document.getElementById("btnGuardarUsuario").setAttribute("data-action", "editar");
+
+                const modal = new bootstrap.Modal(document.getElementById("modalCrearUsuario"));
+                modal.show();
+            })
+            .catch(error => {
+                console.error(error);
+                alert("Error al cargar datos del usuario.");
+            });
+    }
+</script>
+<!-- ✅ Agrega aquí -->
+<script>
+    document.getElementById("modalCrearUsuario").addEventListener("hidden.bs.modal", function () {
+        const form = document.getElementById("formCrearUsuario");
+        form.reset();
+        form.removeAttribute("data-id");
+        document.getElementById("btnGuardarUsuario").setAttribute("data-action", "registrar");
+        document.getElementById("modalCrearUsuarioLabel").textContent = "Crear usuario";
+        document.getElementById("passUsuario").setAttribute("required", "true"); // ← esto es clave
+    });
+</script>
+<script>
+    function eliminarUsuario(id) {
+        if (!confirm("¿Estás seguro de que deseas eliminar este usuario?")) return;
+
+        fetch(`/api/usuarios/${id}`, {
+            method: 'DELETE'
+        })
+            .then(res => res.json())
+            .then(data => {
+                if (data.success) {
+                    alert(data.message);
+                    setTimeout(() => location.reload(), 500);
+                } else {
+                    alert("Error: " + data.message);
+                }
+            })
+            .catch(error => {
+                console.error(error);
+                alert("No se pudo eliminar el usuario.");
+            });
+    }
+</script>
+<script>
+    function cambiarEstadoUsuario(checkbox) {
+        const idUsuario = checkbox.getAttribute("data-id");
+        const nuevoEstado = checkbox.checked ? 'activo' : 'inactivo';
+
+        fetch(`/usuarios/${idUsuario}/estado`, {
+            method: 'PUT',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({ estado: nuevoEstado })
+        })
+            .then(response => {
+                if (!response.ok) throw new Error('Error al cambiar estado');
+                return response.json();
+            })
+            .then(data => {
+                // Actualizar el texto de estado al lado del switch
+                const textoEstado = document.getElementById(`estado-text-${idUsuario}`);
+                if (textoEstado) {
+                    textoEstado.textContent = nuevoEstado.charAt(0).toUpperCase() + nuevoEstado.slice(1);
+                }
+
+                // Mostrar alerta de confirmación
+                alert(`Estado cambiado a ${nuevoEstado.toUpperCase()}`);
+            })
+            .catch(error => {
+                alert("No se pudo cambiar el estado.");
+                checkbox.checked = !checkbox.checked; // revertir cambio si hubo error
+            });
+    }
+</script>
+
+
+
+
+
+{% endblock %}

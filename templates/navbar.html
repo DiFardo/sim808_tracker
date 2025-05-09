@@ -1,0 +1,356 @@
+<!doctype html>
+<html lang="en">
+
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
+    <title>Sistema monitoreo</title>
+
+    <!-- Bootstrap CSS -->
+    <link rel="stylesheet" href="/static/css/custom.css">
+    <!-- Google fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Material+Icons" rel="stylesheet">
+    <style>
+        .hidden {
+            display: none;
+        }
+
+        .profile-image {
+            position: relative;
+            width: 30px;
+            height: 30px;
+        }
+
+        .profile-image img {
+            border-radius: 50%;
+            width: 100%;
+            height: 100%;
+        }
+
+        .active-status {
+            position: absolute;
+            bottom: 0;
+            right: 0;
+            width: 10px;
+            height: 10px;
+            background-color: #2ccc74;
+            border: 2px solid white;
+            border-radius: 50%;
+        }
+
+        .ventana-flotante {
+            position: fixed;
+            top: 70px;
+            right: 25px;
+            width: 360px;
+            background-color: #fff;
+            border: 1px solid #e3e3e3;
+            border-radius: 10px;
+            box-shadow: 0px 6px 12px rgba(0, 0, 0, 0.15);
+            z-index: 1050;
+            padding: 15px;
+            animation: fadeIn 0.3s ease-in-out;
+        }
+
+        .ventana-flotante h5 {
+            font-size: 1.2rem;
+            font-weight: bold;
+            color: #333;
+            margin-bottom: 10px;
+        }
+
+        .contenido-flotante {
+            display: none;
+        }
+
+        .contenido-flotante.active {
+            display: block;
+        }
+
+        .btn-sm {
+            font-size: 0.9rem;
+        }
+
+        @keyframes fadeIn {
+            from {
+                opacity: 0;
+                transform: translateY(-10px);
+            }
+
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .status-dot {
+            font-size: 1.4rem;
+            line-height: 1;
+            vertical-align: middle;
+        }
+
+        .status-indicator {
+            display: inline-block;
+            width: 12px;
+            height: 12px;
+            background-color: #2ccc74;
+            border-radius: 50%;
+            margin-left: 5px;
+            vertical-align: middle;
+        }
+
+
+        .text-success {
+            color: #2ccc74 !important;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="wrapper sidebar-active">
+        <nav id="sidebar" class="sidebar js-sidebar">
+            <div class="sidebar-content js-simplebar">
+                <a class="sidebar-brand" href="/index">
+                    <span class="align-middle">Monitoreo de flota</span>
+                </a>
+
+                <ul class="sidebar-nav">
+                    <li class="sidebar-header">Gestión</li>
+
+                    <li class="sidebar-item active">
+                        <a class="sidebar-link" href="/index">
+                            <i class="align-middle" data-feather="sliders"></i> <span class="align-middle">Inicio</span>
+                        </a>
+                    </li>
+
+                    <li class="sidebar-item">
+                        <a class="sidebar-link" href="{{ url_for('vehiculos') }}">
+                            <i class="align-middle" data-feather="table"></i> <span class="align-middle">Flotas</span>
+                        </a>
+                    </li>
+
+                    <li class="sidebar-item">
+                        <a class="sidebar-link" href="{{ url_for('mapa_flotas') }}">
+                            <i class="align-middle" data-feather="calendar"></i> <span class="align-middle">Mapa</span>
+                        </a>
+                    </li>
+                    <li class="sidebar-item">
+                        <a class="sidebar-link" href="{{ url_for('rutas_programadas') }}">
+                            <i class="align-middle" data-feather="map"></i>
+                            <span class="align-middle">Rutas programadas</span>
+                        </a>
+                    </li>
+
+                    <li class="sidebar-item">
+                        <a class="sidebar-link" href="/gestion_productos">
+                            <i class="align-middle" data-feather="list"></i> <span class="align-middle">Alertas</span>
+                        </a>
+                    </li>
+
+                    <li class="sidebar-header">Herramientas</li>
+
+                    <li class="sidebar-item">
+                        <a class="sidebar-link" href="#">
+                            <i class="align-middle" data-feather="bar-chart-2"></i> <span class="align-middle">Reportes</span>
+                        </a>
+                    </li>
+
+                    <li class="sidebar-item">
+                        <a class="sidebar-link" href="{{ url_for('usuarios') }}">
+                            <i class="align-middle" data-feather="user"></i> <span class="align-middle">Usuarios</span>
+                        </a>
+                    </li>
+                </ul>
+            </div>
+        </nav>
+
+
+        <!-- Contenido Principal -->
+        <div id="content">
+            <div class="top-navbar text-white">
+                <div class="d-flex align-items-center justify-content-between px-3 py-2">
+                    <!-- Menú de Hamburguesa -->
+                    <div class="col-2 col-md-1 align-self-center">
+                        <div class="xp-menubar">
+                            <span class="material-icons text-white">signal_cellular_alt</span>
+                        </div>
+                    </div>
+
+                    <!-- Notificaciones y Perfil -->
+                    <div class="d-flex align-items-center">
+                        <a href="#" class="text-white me-3" id="notification-icon"
+                            onclick="mostrarVentana('notificaciones')">
+                            <span class="material-icons">notifications</span>
+                            {% if notificaciones and notificaciones|length > 0 %}
+                            <span class="badge bg-danger rounded-circle" id="notification-count">{{
+                                notificaciones|length }}</span>
+                            {% endif %}
+                        </a>
+                        <a href="#" class="d-flex align-items-center gap-2 text-white text-decoration-none"
+                            id="profile-icon" onclick="mostrarVentana('perfil')">
+                            <span class="material-icons fs-2 align-middle">account_circle</span>
+                            <div class="d-flex flex-column d-none d-md-flex">
+                                <span class="fw-semibold">{{ usuario[4] }}
+                                    <span class="status-indicator bg-success"></span>
+                                </span>
+                            </div>
+                        </a>
+
+
+
+                    </div>
+                </div>
+            </div>
+
+            <!-- Ventana Flotante -->
+            <div id="ventana-flotante" class="ventana-flotante hidden">
+                <div id="contenido-notificaciones" class="contenido-flotante">
+                    <h5>
+                        <span class="material-icons">notifications</span>
+                        Notificaciones
+                    </h5>
+                    <p>No hay notificaciones nuevas.</p>
+                </div>
+                <div id="contenido-perfil" class="contenido-flotante hidden">
+                    <h5 class="text-center mb-3">
+                        <span class="material-icons">person</span>
+                        Perfil de Usuario
+                    </h5>
+                    <p><strong>Nombre:</strong> {{ usuario[4] }}</p>
+                    <p><strong>Rol:</strong> {{ usuario[5] }}</p>
+                    <div class="d-grid gap-2">
+                        <a href="/procesar_logout" class="btn btn-danger btn-sm">Cerrar Sesión</a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <!-- Contenido del perfil -->
+    <div id="contenido-perfil" class="contenido-flotante hidden">
+        <h5 class="text-center mb-3">
+            <span class="material-icons">person</span>
+            Perfil de Usuario
+        </h5>
+        <p><strong>Nombre:</strong> {{ usuario[4] }}</p>
+        <p><strong>Rol:</strong> {{ usuario[5] }}</p>
+        <div class="d-flex justify-content-between mt-4">
+            <a href="{}" class="btn btn-primary w-50 me-2">
+                Ver Perfil
+            </a>
+            <a href="/procesar_logout" class="btn btn-danger w-50 ms-2">
+                Cerrar Sesión
+            </a>
+        </div>
+    </div>
+    </div>
+
+
+    <!-- Contenido del perfil -->
+    <div id="contenido-perfil" class="contenido-flotante hidden">
+        <h5 class="text-center mb-3">
+            <span class="material-icons">person</span>
+            Perfil de Usuario
+        </h5>
+
+        <p><strong>Nombre:</strong> </p>
+        <p><strong>Rol:</strong> </p>
+
+        <!-- Botones alineados y de igual tamaño -->
+        <div class="d-flex justify-content-between mt-4">
+            <a href="" class="btn btn-primary w-50 me-2">
+                Ver Perfil
+            </a>
+            <a href="" class="btn btn-danger w-50 ms-2">
+                Cerrar Sesión
+            </a>
+        </div>
+    </div>
+    </div>
+    </div>
+
+    <script>
+        // Opciones por módulo en un array de objetos
+        const modules = {
+            "menu": [
+                { title: "Productos", url: "/gestion_productos", icon: "restaurant_menu" },
+                { title: "Menú", url: "/gestion_menu_dia", icon: "today" },
+                { title: "Mesas", url: "/gestion_mesas_menu", icon: "table_bar" }
+            ],
+            "contable": [
+                { title: "Cuentas Contables", url: "/cuentas", icon: "folder" },
+                { title: "Libros Contables", url: "/libros", icon: "library_books" }
+            ]
+        };
+
+        // Función para renderizar las opciones del módulo en el sidebar
+        function renderModuleOptions(moduleKey) {
+            const navbarOptions = document.getElementById('navbar-options');
+            const currentOptions = modules[moduleKey] || [];
+
+            // Limpia las opciones existentes
+            navbarOptions.innerHTML = `
+                <li class="nav-item">
+                    <a href="{{ url_for('index') }}" class="dashboard">
+                        <i class="material-icons">dashboard</i>
+                        <span>Inicio</span>
+                    </a>
+                </li>
+            `;
+
+            // Agrega las opciones del módulo actual
+            currentOptions.forEach(option => {
+                navbarOptions.innerHTML += `
+                    <li class="nav-item">
+                        <a href="${option.url}">
+                            <i class="material-icons">${option.icon}</i>
+                            <span>${option.title}</span>
+                        </a>
+                    </li>
+                `;
+            });
+        }
+
+        // Detectar el módulo activo basado en el path actual
+        document.addEventListener("DOMContentLoaded", function () {
+            const currentPath = window.location.pathname;
+
+            // Detectar módulo basado en el path
+            if (currentPath.includes('gestion_productos') || currentPath.includes('menu_del_dia') || currentPath.includes('mesas_menu')) {
+                renderModuleOptions("menu");
+            } else if (currentPath.includes('cuentas') || currentPath.includes('libros')) {
+                renderModuleOptions("contable");
+            } else {
+                renderModuleOptions(""); // Default (solo inicio)
+            }
+        });
+
+
+        function mostrarVentana(tipo) {
+            const ventana = document.getElementById('ventana-flotante');
+            const notificaciones = document.getElementById('contenido-notificaciones');
+            const perfil = document.getElementById('contenido-perfil');
+
+            ventana.classList.remove('hidden');
+
+            if (tipo === 'notificaciones') {
+                notificaciones.classList.add('active');
+                perfil.classList.remove('active');
+            } else if (tipo === 'perfil') {
+                perfil.classList.add('active');
+                notificaciones.classList.remove('active');
+            }
+        }
+
+        document.addEventListener('click', function (event) {
+            const ventana = document.getElementById('ventana-flotante');
+            if (!ventana.contains(event.target) && !event.target.closest('#notification-icon') && !event.target.closest('#profile-icon')) {
+                ventana.classList.add('hidden');
+            }
+        });
+    </script>
+
+
+</body>
+
+</html>

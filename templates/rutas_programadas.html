@@ -1,0 +1,415 @@
+<!-- Sección extendida y estilos -->
+{% extends "pagina_maestra.html" %}
+
+{% block titulo %}Programar Ruta{% endblock %}
+
+{% block link %}
+<link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css" rel="stylesheet">
+<link href="{{ url_for('static', filename='css/custom.css') }}" rel="stylesheet">
+<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+<link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
+<link rel="stylesheet" href="{{ url_for('static', filename='css/app.css') }}">
+
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Roboto&display=swap');
+
+  body {
+    font-family: 'Roboto', sans-serif;
+    background-color: #f8f9fa;
+  }
+
+  /* CABECERA TABLE-TITLE */
+  .table-title {
+    background-color: #e6ebef;
+    border: 1px solid #d2d6da;
+    border-radius: 8px;
+    padding: 10px 16px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-wrap: wrap;
+  }
+
+  .table-title .input-group {
+    max-width: 260px;
+  }
+
+  .table-title .material-icons,
+  .table-title i {
+    vertical-align: middle;
+    font-size: 18px;
+  }
+
+  .table-title .btn span {
+    margin-left: 4px;
+  }
+
+  .table-title .btn {
+    font-size: 0.85rem;
+    border-radius: 6px;
+    padding: 6px 10px;
+  }
+
+  /* TABLA DE RUTAS */
+  .tabla-rutas {
+    font-size: 0.95rem;
+    border-radius: 10px;
+    overflow: hidden;
+    box-shadow: 0 4px 10px rgba(0, 0, 0, 0.05);
+    background-color: #fff;
+  }
+
+  .tabla-rutas thead {
+    background-color: #2d3e50;
+    color: #ffffff;
+  }
+
+  .tabla-rutas th {
+    padding: 12px;
+    font-weight: 600;
+    text-transform: uppercase;
+    border: none;
+  }
+
+  .tabla-rutas td {
+    background-color: #ffffff;
+    border: none;
+    vertical-align: middle;
+    padding: 10px 8px;
+    color: #333;
+  }
+
+  .tabla-rutas tr:hover td {
+    background-color: #f0f4f8;
+  }
+
+  /* BOTONES DE ACCIÓN EN CELDA */
+  .btn-icon {
+    border: none;
+    padding: 6px 8px;
+    font-size: 0.85rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 6px;
+    transition: 0.2s ease-in-out;
+  }
+
+  .btn-editar {
+    background-color: #349e4d;
+    color: #fff;
+  }
+
+  .btn-editar:hover {
+    background-color: #2e8741;
+  }
+
+  .btn-eliminar {
+    background-color: #dc3545;
+    color: #fff;
+  }
+
+  .btn-eliminar:hover {
+    background-color: #bd2130;
+  }
+
+  /* RESPONSIVE */
+  @media (max-width: 767px) {
+    .tabla-rutas {
+      font-size: 0.85rem;
+    }
+
+    .tabla-rutas th,
+    .tabla-rutas td {
+      padding: 8px 5px;
+    }
+
+    .btn-icon {
+      padding: 5px 6px;
+      font-size: 0.75rem;
+    }
+
+    .table-title {
+      flex-direction: column;
+      align-items: flex-start;
+      gap: 8px;
+    }
+
+    .table-title .btn-group {
+      width: 100%;
+      display: flex;
+      justify-content: flex-start;
+      gap: 6px;
+    }
+
+    .table-title .input-group {
+      width: 100%;
+    }
+  }
+</style>
+
+
+
+
+
+{% endblock %}
+
+{% block contenido %}
+<div id="content">
+  <div class="main-content container-fluid">
+
+    <!-- Breadcrumb -->
+    <nav aria-label="breadcrumb" class="mb-3">
+      <ol class="breadcrumb">
+        {% for crumb in breadcrumbs %}
+        {% if loop.last %}
+        <li class="breadcrumb-item active" aria-current="page">{{ crumb.name }}</li>
+        {% else %}
+        <li class="breadcrumb-item"><a href="{{ crumb.url }}">{{ crumb.name }}</a></li>
+        {% endif %}
+        {% endfor %}
+      </ol>
+    </nav>
+
+    <!-- Cabecera de tabla tipo "table-title" para rutas programadas -->
+    <div
+      class="table-title d-flex flex-wrap justify-content-between align-items-center mb-3 p-2 rounded bg-light shadow-sm">
+      <!-- Buscador compacto -->
+      <div class="input-group input-group-sm buscador-rutas" style="max-width: 260px;">
+        <input type="text" class="form-control" id="buscadorRutas" placeholder="Buscar rutas...">
+        <button class="btn btn-outline-secondary" type="button">
+          <i class="fas fa-search"></i>
+        </button>
+      </div>
+
+      <!-- Botones de acción -->
+      <div class="btn-group mt-2 mt-sm-0">
+        <button class="btn btn-success btn-sm" data-bs-toggle="modal" data-bs-target="#modalRuta">
+          <i class="material-icons">add</i> Nueva Ruta
+        </button>
+      </div>
+    </div>
+
+
+
+    {% set rutas_por_conductor = {} %}
+    {% for ruta in rutas %}
+    {% set conductor = ruta.conductor %}
+    {% if conductor not in rutas_por_conductor %}
+    {% set _ = rutas_por_conductor.update({conductor: []}) %}
+    {% endif %}
+    {% set _ = rutas_por_conductor[conductor].append(ruta) %}
+    {% endfor %}
+    <!-- Tabla de rutas -->
+    <div class="table-responsive shadow-sm">
+      <table class="table table-bordered align-middle text-center tabla-rutas">
+        <thead>
+          <tr>
+            <th>Conductor</th>
+            <th>Fecha</th>
+            <th>Vehículo</th>
+            <th>Ruta</th>
+            <th>Salida</th>
+            <th>Llegada</th>
+            <th>Duración</th>
+            <th>Acciones</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for conductor, rutas_del_conductor in rutas_por_conductor.items() %}
+          {% for ruta in rutas_del_conductor %}
+          <tr>
+            <td><strong>{{ conductor }}</strong></td>
+            <td>{{ ruta.fecha }}</td>
+            <td>{{ ruta.vehiculo }}</td>
+            <td>{{ ruta.origen }} → {{ ruta.destino }}</td>
+            <td>{{ ruta.hora_salida }}</td>
+            <td>{{ ruta.hora_llegada or '-' }}</td>
+            <td>{{ ruta.duracion }}</td>
+            <td>
+              <div class="d-flex justify-content-center gap-2">
+                <button class="btn btn-icon btn-editar" title="Editar">
+                  <i class="fas fa-pen"></i>
+                </button>
+                <button class="btn btn-icon btn-eliminar" title="Eliminar">
+                  <i class="fas fa-trash-alt"></i>
+                </button>
+              </div>
+            </td>
+          </tr>
+          {% endfor %}
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<!-- Modal Nueva Ruta -->
+<div class="modal fade" id="modalRuta" tabindex="-1" aria-labelledby="modalRutaLabel" aria-hidden="true">
+  <div class="modal-dialog modal-lg modal-dialog-centered">
+    <div class="modal-content">
+      <div class="modal-header bg-success text-white">
+        <h5 class="modal-title">Asignar Nueva Ruta</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+
+      <form id="formAsignarRuta">
+        <div class="modal-body">
+          
+          <!-- Conductor y Vehículo -->
+          <div class="row mb-3">
+            <div class="col-md-6">
+              <label for="conductor">Conductor</label>
+              <select id="conductor" name="conductor" class="form-select" required>
+                <option value="">Seleccione</option>
+                {% for conductor in conductores %}
+                <option value="{{ conductor.id }}">{{ conductor.nombre }} {{ conductor.apellido }}</option>
+                {% endfor %}
+              </select>
+            </div>
+            <div class="col-md-6">
+              <label for="vehiculo">Vehículo</label>
+              <select id="vehiculo" name="vehiculo" class="form-select" required>
+                <option value="">Seleccione</option>
+                {% for vehiculo in vehiculos %}
+                <option value="{{ vehiculo.id }}">{{ vehiculo.modelo }} - {{ vehiculo.placa }}</option>
+                {% endfor %}
+              </select>
+            </div>
+          </div>
+
+          <!-- Destino -->
+          <div class="row mb-3">
+            <div class="col-12">
+              <label for="destino_input">Destino</label>
+              <input type="text" id="destino_input" name="destino" class="form-control"
+                placeholder="Buscar dirección de destino" required>
+              <input type="hidden" name="destino_coords" id="destino_coords">
+              <div id="mapa_destino" class="mt-2" style="height: 300px; border: 1px solid #ccc;"></div>
+            </div>
+          </div>
+
+          <!-- Fecha y hora -->
+          <div class="row">
+            <div class="col-md-6">
+              <label for="fecha">Fecha</label>
+              <input type="date" class="form-control" id="fecha" name="fecha" required>
+            </div>
+            <div class="col-md-6">
+              <label for="hora_salida">Hora de Salida</label>
+              <input type="time" class="form-control" id="hora_salida" name="hora_salida" required>
+            </div>
+          </div>
+
+          <!-- Info del origen automático -->
+          <div class="row mt-3">
+            <div class="col">
+              <div class="alert alert-secondary text-center small">
+                📡 <strong>Nota:</strong> El punto de <strong>origen</strong> será capturado automáticamente desde el GPS del vehículo.
+              </div>
+            </div>
+          </div>
+
+        </div>
+
+        <!-- Botón Guardar -->
+        <div class="modal-footer">
+          <button type="submit" class="btn btn-success w-100">
+            <i class="fas fa-save me-2"></i>Guardar Ruta
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+<script>
+  document.getElementById("formAsignarRuta").addEventListener("submit", async function (e) {
+    e.preventDefault();
+    const formData = new FormData(this);
+    const response = await fetch("/api/asignar_ruta", {
+      method: "POST",
+      body: formData
+    });
+    const result = await response.json();
+    if (result.success) {
+      alert("Ruta asignada correctamente.");
+      location.reload();
+    } else {
+      alert("Error: " + result.message);
+    }
+  });
+</script>
+<script>
+  document.getElementById("buscadorRutas").addEventListener("input", function () {
+    const query = this.value.toLowerCase();
+    const tarjetas = document.querySelectorAll(".card");
+
+    tarjetas.forEach(card => {
+      const contenido = card.textContent.toLowerCase();
+      card.style.display = contenido.includes(query) ? "" : "none";
+    });
+  });
+</script>
+<script>
+  let mapaDestino, marcadorDestino;
+  let geocoder;
+
+  function initMap() {
+    const chiclayo = { lat: -6.7714, lng: -79.8409 };
+    geocoder = new google.maps.Geocoder();
+
+    // DESTINO
+    mapaDestino = new google.maps.Map(document.getElementById("mapa_destino"), {
+      center: chiclayo,
+      zoom: 14
+    });
+
+    marcadorDestino = new google.maps.Marker({
+      map: mapaDestino,
+      label: "D",
+      draggable: true
+    });
+
+    const inputDestino = document.getElementById("destino_input");
+    const autocompleteDestino = new google.maps.places.Autocomplete(inputDestino, {
+      fields: ["geometry", "formatted_address"],
+      componentRestrictions: { country: "pe" }
+    });
+
+    autocompleteDestino.addListener("place_changed", function () {
+      const place = autocompleteDestino.getPlace();
+      if (!place.geometry) return;
+      const loc = place.geometry.location;
+      mapaDestino.setCenter(loc);
+      marcadorDestino.setPosition(loc);
+      document.getElementById("destino_coords").value = `${loc.lat()},${loc.lng()}`;
+      inputDestino.value = place.formatted_address;
+    });
+
+    mapaDestino.addListener("click", function (e) {
+      marcadorDestino.setPosition(e.latLng);
+      document.getElementById("destino_coords").value = `${e.latLng.lat()},${e.latLng.lng()}`;
+      geocodeLatLng(e.latLng, "destino_input");
+    });
+  }
+
+  function geocodeLatLng(latlng, inputId) {
+    geocoder.geocode({ location: latlng }, (results, status) => {
+      if (status === "OK" && results[0]) {
+        document.getElementById(inputId).value = results[0].formatted_address;
+      }
+    });
+  }
+</script>
+
+
+
+
+<script async defer
+  src="https://maps.googleapis.com/maps/api/js?key=AIzaSyAABGMtrjdoukcZT2XUBLbtLLgeLRxuZHo&libraries=places&callback=initMap">
+  </script>
+
+
+{% endblock %}

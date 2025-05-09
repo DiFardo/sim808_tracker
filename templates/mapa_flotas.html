@@ -1,0 +1,191 @@
+{% extends "pagina_maestra.html" %}
+
+{% block titulo %}Seguimiento en tiempo real{% endblock %}
+
+{% block link %}
+<!-- Font Awesome for icons -->
+<link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css" rel="stylesheet">
+<link href="{{ url_for('static', filename='css/custom.css') }}" rel="stylesheet">
+<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+<link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
+<link rel="stylesheet" href="{{ url_for('static', filename='css/app.css') }}">
+<style>
+  #map {
+  width: 100%;
+  height: 100%;
+  min-height: 500px;
+  border: 1px solid #dee2e6;
+  transition: all 0.4s ease;
+}
+
+.fleet-box {
+  background: #ffffff;
+  border: 1px solid #dee2e6;
+  padding: 12px 15px;
+  margin-bottom: 12px;
+  border-left: 5px solid #198754;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+}
+
+.fleet-box .fleet-title {
+  font-weight: bold;
+  color: #343a40;
+}
+
+.fleet-box .time {
+  font-size: 0.9em;
+  color: #6c757d;
+}
+
+#toggle-sidebar-btn {
+  position: absolute;
+  top: 50%;
+  left: 33.33%;
+  transform: translateY(-50%);
+  z-index: 1000;
+  background: #007bff;
+  color: white;
+  border-radius: 50%;
+  width: 34px;
+  height: 34px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+}
+
+/* Efecto de colapso suave */
+#fleet-sidebar {
+  transition: all 0.4s ease;
+  overflow: hidden;
+}
+
+#fleet-sidebar.collapsed {
+  width: 0 !important;
+  padding: 0 !important;
+  opacity: 0;
+  pointer-events: none;
+}
+
+</style>
+{% endblock %}
+
+{% block contenido %}
+<div id="content">
+  <div class="main-content">
+          <!-- Breadcrumb dinámico -->
+          <nav aria-label="breadcrumb" class="mb-3">
+            <ol class="breadcrumb">
+              {% for crumb in breadcrumbs %}
+              {% if loop.last %}
+              <li class="breadcrumb-item active" aria-current="page">{{ crumb.name }}</li>
+              {% else %}
+              <li class="breadcrumb-item"><a href="{{ crumb.url }}">{{ crumb.name }}</a></li>
+              {% endif %}
+              {% endfor %}
+            </ol>
+          </nav>
+    <div class="container-fluid mt-3">
+      <div class="row position-relative" style="min-height: 600px;">
+
+        <!-- Botón fuera del panel -->
+        <div id="toggle-sidebar-btn">
+          <i class="fas fa-chevron-left"></i>
+        </div>
+
+        <!-- Panel de flotas -->
+        <div id="fleet-sidebar" class="col-md-4 position-relative">
+          <div class="card h-100">
+            <div class="card-body">
+              <h5 class="mb-3">🚛 Flotas disponibles</h5>
+
+              <div class="fleet-box">
+                <div class="fleet-title">Flota 12</div>
+                <div class="time">Última ubicación: 10:12 AM</div>
+                <div class="text-muted">Massachusetts Ave NE</div>
+              </div>
+
+              <div class="fleet-box">
+                <div class="fleet-title">Flota 05</div>
+                <div class="time">Última ubicación: 10:08 AM</div>
+                <div class="text-muted">17th St SE</div>
+              </div>
+
+              <div class="fleet-box">
+                <div class="fleet-title">Flota 21</div>
+                <div class="time">Última ubicación: 9:45 AM</div>
+                <div class="text-muted">Capitol St SE</div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Mapa -->
+        <div id="map-container" class="col-md-8">
+          <div id="map"></div>
+        </div>
+
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Script de inicialización del mapa -->
+<script>
+  function initMap() {
+    const centro = { lat: 38.89511, lng: -77.03637 }; // Washington DC
+    const map = new google.maps.Map(document.getElementById("map"), {
+      zoom: 13,
+      center: centro,
+      mapTypeId: 'roadmap'
+    });
+
+    new google.maps.Marker({
+      position: centro,
+      map: map,
+      title: "Flota 12"
+    });
+  }
+</script>
+
+<!-- Carga de API con callback -->
+<script async defer
+  src="https://maps.googleapis.com/maps/api/js?key=AIzaSyAABGMtrjdoukcZT2XUBLbtLLgeLRxuZHo&callback=initMap">
+</script>
+
+<script>
+  document.addEventListener('DOMContentLoaded', function () {
+    const toggleBtn = document.getElementById('toggle-sidebar-btn');
+    const sidebar = document.getElementById('fleet-sidebar');
+    const mapContainer = document.getElementById('map-container');
+    const icon = toggleBtn.querySelector('i');
+    let isVisible = true;
+
+    toggleBtn.addEventListener('click', function () {
+      if (isVisible) {
+        sidebar.style.display = 'none';
+        mapContainer.classList.remove('col-md-8');
+        mapContainer.classList.add('col-md-12');
+
+        // Mueve el botón al borde izquierdo
+        toggleBtn.style.left = '10px';
+        icon.classList.remove('fa-chevron-left');
+        icon.classList.add('fa-chevron-right');
+      } else {
+        sidebar.style.display = 'block';
+        mapContainer.classList.remove('col-md-12');
+        mapContainer.classList.add('col-md-8');
+
+        // Devuelve el botón al borde del panel
+        toggleBtn.style.left = '33.33%'; // o puedes ajustar con calc si es necesario
+        icon.classList.remove('fa-chevron-right');
+        icon.classList.add('fa-chevron-left');
+      }
+
+      isVisible = !isVisible;
+    });
+  });
+</script>
+{% endblock %}
