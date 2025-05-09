@@ -7,6 +7,7 @@ import json
 import controladores.controlador_usuarios as controlador_usuarios
 import controladores.controlador_vehiculo as controlador_vehiculo
 import controladores.controlador_rutas as controlador_rutas
+from bd_conexion import obtener_conexion
 
 from controladores.controlador_vehiculo import agregar_vehiculo, obtener_vehiculos
 from werkzeug.security import check_password_hash
@@ -333,7 +334,32 @@ def api_asignar_ruta():
     except Exception as e:
         return jsonify({"success": False, "message": f"Error: {str(e)}"}), 500
 
+@app.route("/api/ruta-actual", methods=["GET"])
+def obtener_ruta_actual():
+    id_vehiculo = request.args.get("id_vehiculo")
+    if not id_vehiculo:
+        return jsonify({"success": False, "message": "Falta id_vehiculo"}), 400
 
+    conexion = obtener_conexion()
+    try:
+        with conexion.cursor() as cursor:
+            cursor.execute("""
+                SELECT rp.id
+                FROM rutas_programadas rp
+                JOIN asignacion_ruta_conductor arc ON arc.id_ruta = rp.id
+                WHERE arc.id_vehiculo = %s
+                ORDER BY rp.creado_en DESC
+                LIMIT 1;
+            """, (id_vehiculo,))
+            resultado = cursor.fetchone()
+            if resultado:
+                return jsonify({"id_ruta": resultado[0]}), 200
+            else:
+                return jsonify({"message": "No hay rutas activas"}), 404
+    except Exception as e:
+        return jsonify({"message": str(e)}), 500
+    finally:
+        conexion.close()
 
 
 
