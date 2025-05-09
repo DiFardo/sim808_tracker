@@ -339,29 +339,59 @@ def api_asignar_ruta():
 @app.route("/api/ruta-actual", methods=["GET"])
 def obtener_ruta_actual():
     id_vehiculo = request.args.get("id_vehiculo")
-    if not id_vehiculo:
-        return jsonify({"success": False, "message": "Falta id_vehiculo"}), 400
+    conexion = obtener_conexion()
+    try:
+        with conexion.cursor() as cursor:
+            cursor.execute("""
+                SELECT arc.id_ruta
+                FROM asignacion_ruta_conductor arc
+                JOIN rutas_programadas rp ON arc.id_ruta = rp.id
+                WHERE arc.id_vehiculo = %s AND arc.estado = 'Activa'
+                ORDER BY arc.asignado_en DESC
+                LIMIT 1;
+            """, (id_vehiculo,))
+            resultado = cursor.fetchone()
+            if resultado:
+                return jsonify({"id_ruta": resultado[0]})
+            else:
+                return jsonify({"id_ruta": None}), 404
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+    finally:
+        conexion.close()
+
+@app.route("/api/registrar_origen_gps", methods=["POST"])
+def registrar_origen_gps():
+    data = request.get_json()
+    id_ruta = data.get("id_ruta")
+    lat = data.get("lat")
+    lon = data.get("lon")
+
+    if not all([id_ruta, lat, lon]):
+        return jsonify({"error": "Datos incompletos"}), 400
+
+    # Puedes usar geopy para traducir coordenadas a texto (opcional)
+    direccion = f"Lat: {lat}, Lon: {lon}"
 
     conexion = obtener_conexion()
     try:
         with conexion.cursor() as cursor:
             cursor.execute("""
-                SELECT rp.id
-                FROM rutas_programadas rp
-                JOIN asignacion_ruta_conductor arc ON arc.id_ruta = rp.id
-                WHERE arc.id_vehiculo = %s
-                ORDER BY rp.creado_en DESC
-                LIMIT 1;
-            """, (id_vehiculo,))
-            resultado = cursor.fetchone()
-            if resultado:
-                return jsonify({"id_ruta": resultado[0]}), 200
-            else:
-                return jsonify({"message": "No hay rutas activas"}), 404
+                UPDATE rutas_programadas
+                SET origen = %s,
+                    origen_lat = %s,
+                    origen_lon = %s
+                WHERE id = %s;
+            """, (direccion, lat, lon, id_ruta))
+        conexion.commit()
+        return jsonify({"success": True, "message": "Origen actualizado"}), 200
     except Exception as e:
-        return jsonify({"message": str(e)}), 500
+        conexion.rollback()
+        return jsonify({"success": False, "message": str(e)}), 500
     finally:
         conexion.close()
+
+
 
 
 
