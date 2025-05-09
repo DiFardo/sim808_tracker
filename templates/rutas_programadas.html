@@ -353,7 +353,6 @@
   });
 </script>
 <script>
-  
   let mapaDestino, marcadorDestino;
   let geocoder;
 
@@ -395,7 +394,7 @@
       inputCoords.value = `${loc.lat()},${loc.lng()}`;
       inputDestino.value = direccionCompleta;
 
-      // Guardar como atributos adicionales si deseas usarlos en el submit
+      // Guardar como atributos si los necesitas luego
       inputDestino.setAttribute("data-corta", direccionCorta);
       inputDestino.setAttribute("data-completa", direccionCompleta);
     });
@@ -404,7 +403,11 @@
       const latlng = e.latLng;
       marcadorDestino.setPosition(latlng);
       inputCoords.value = `${latlng.lat()},${latlng.lng()}`;
-      geocodeLatLng(latlng, "destino_input");
+
+      // Solo autocompletar si no hay texto
+      if (!inputDestino.value || inputDestino.value.length < 5) {
+        geocodeLatLng(latlng, "destino_input");
+      }
     });
   }
 
@@ -421,7 +424,19 @@
       }
     });
   }
+
+  // Validar campos antes de enviar
+  document.getElementById("formAsignarRuta").addEventListener("submit", function (e) {
+    const destinoCoords = document.getElementById("destino_coords").value.trim();
+    const destinoTexto = document.getElementById("destino_input").value.trim();
+
+    if (!destinoCoords || !destinoTexto) {
+      e.preventDefault();
+      alert("⚠️ Debes seleccionar una dirección válida en el mapa o con autocompletado.");
+    }
+  });
 </script>
+
 
 
 
