@@ -353,14 +353,7 @@
   });
 </script>
 <script>
-  const inputDestino = document.getElementById("destino_input");
-
-const direccionCorta = inputDestino.getAttribute("data-corta");
-const direccionCompleta = inputDestino.getAttribute("data-completa");
-
-formData.append("destino", direccionCorta);
-formData.append("destino_direccion", direccionCompleta);
-
+  
   let mapaDestino, marcadorDestino;
   let geocoder;
 
