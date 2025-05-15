@@ -361,6 +361,7 @@ def obtener_ruta_actual():
         conexion.close()
 
 @app.route("/api/registrar_origen_gps", methods=["POST"])
+@app.route("/api/registrar_origen_gps/", methods=["POST"])
 def registrar_origen_gps():
     data = request.get_json()
     print("📦 Payload recibido:", data)
