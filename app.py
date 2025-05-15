@@ -21,6 +21,8 @@ app.config['JWT_COOKIE_SECURE'] = False  # Pon True si usas HTTPS
 app.config['JWT_ACCESS_COOKIE_NAME'] = 'access_token_cookie'
 app.config['JWT_ACCESS_TOKEN_EXPIRES'] = timedelta(hours=2)
 app.config['JWT_COOKIE_CSRF_PROTECT'] = False  # Pon True si usarás CSRF con cookies
+app.url_map.strict_slashes = False
+
 
 jwt = JWTManager(app)
 
