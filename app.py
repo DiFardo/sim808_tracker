@@ -32,7 +32,15 @@ app.url_map.strict_slashes = False
 
 jwt = JWTManager(app)
 
-
+@app.route('/verificar-conexion')
+def verificar_conexion():
+    try:
+        conn = obtener_conexion()
+        conn.close()
+        return jsonify({"estado": "exitoso", "mensaje": "Conexión a la base de datos establecida correctamente."}), 200
+    except Exception as e:
+        return jsonify({"estado": "error", "mensaje": str(e)}), 500
+    
 # Ruta para la página de inicio de sesión
 @app.route("/")
 @app.route("/login_user")

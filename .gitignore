@@ -10,7 +10,7 @@ __pycache__/
 *$py.class
 
 # Archivos de configuración y variables de entorno
-
+.env
 *.cfg
 instance/
 
