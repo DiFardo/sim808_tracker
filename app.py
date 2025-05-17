@@ -60,7 +60,7 @@ def procesar_login():
             return resp
         else:
             flash("Contraseña incorrecta.")
-            return redirect("/index")
+            return redirect("/login_user")
     except Exception as e:
         flash(f"Ocurrió un error: {str(e)}")
         return redirect("/login_user")
