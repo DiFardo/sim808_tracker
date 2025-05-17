@@ -9,6 +9,85 @@
 <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
 <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
 <link rel="stylesheet" href="{{ url_for('static', filename='css/app.css') }}">
+<link rel="stylesheet" href="//cdn.jsdelivr.net/npm/alertifyjs@1.13.1/build/css/alertify.min.css" />
+<link rel="stylesheet" href="//cdn.jsdelivr.net/npm/alertifyjs@1.13.1/build/css/themes/default.min.css" />
+
+<style>
+  /* Estiliza el contenido del modal */
+  #modalRuta .modal-content {
+    background-color: #ffffff;
+    border-radius: 12px;
+    padding: 0;
+    border: none;
+    box-shadow: 0 6px 25px rgba(0, 0, 0, 0.2);
+  }
+
+  /* Cabecera con mejor presentación */
+  #modalRuta .modal-header {
+    background: linear-gradient(90deg, #2ecc71, #27ae60);
+    border-top-left-radius: 12px;
+    border-top-right-radius: 12px;
+    padding: 20px;
+    text-align: center;
+    justify-content: center;
+  }
+
+  #modalRuta .modal-title {
+    width: 100%;
+    text-align: center;
+    font-weight: bold;
+    font-size: 1.25rem;
+    color: white;
+  }
+
+  /* Botón cerrar ajustado */
+  #modalRuta .modal-header .btn-close {
+    position: absolute;
+    top: 16px;
+    right: 16px;
+    background-color: white;
+    border-radius: 50%;
+    padding: 4px;
+  }
+
+  /* Estilo general de inputs y selects */
+  #modalRuta .form-control,
+  #modalRuta .form-select {
+    border-radius: 8px;
+    font-size: 0.95rem;
+  }
+
+  #modalRuta label {
+    font-weight: 600;
+    margin-bottom: 4px;
+    color: #333;
+  }
+
+  #modalRuta .modal-body {
+    padding: 25px 30px 15px 30px;
+  }
+
+  #modalRuta .modal-footer {
+    padding: 15px 30px 25px 30px;
+    border-top: none;
+  }
+
+  #modalRuta .modal-footer .btn {
+    font-size: 1rem;
+    padding: 10px 15px;
+    border-radius: 8px;
+  }
+
+  #modalRuta .alert {
+    border-radius: 8px;
+  }
+
+  /* Mapa */
+  #mapa_destino {
+    border-radius: 8px;
+    border: 1px solid #ced4da;
+  }
+</style>
 
 <style>
   @import url('https://fonts.googleapis.com/css2?family=Roboto&display=swap');
@@ -30,58 +109,6 @@
     flex-wrap: wrap;
   }
 
-  .table-title .input-group {
-    max-width: 260px;
-  }
-
-  .table-title .material-icons,
-  .table-title i {
-    vertical-align: middle;
-    font-size: 18px;
-  }
-
-  .table-title .btn span {
-    margin-left: 4px;
-  }
-
-  .table-title .btn {
-    font-size: 0.85rem;
-    border-radius: 6px;
-    padding: 6px 10px;
-  }
-
-  /* TABLA DE RUTAS */
-  .tabla-rutas {
-    font-size: 0.95rem;
-    border-radius: 10px;
-    overflow: hidden;
-    box-shadow: 0 4px 10px rgba(0, 0, 0, 0.05);
-    background-color: #fff;
-  }
-
-  .tabla-rutas thead {
-    background-color: #2d3e50;
-    color: #ffffff;
-  }
-
-  .tabla-rutas th {
-    padding: 12px;
-    font-weight: 600;
-    text-transform: uppercase;
-    border: none;
-  }
-
-  .tabla-rutas td {
-    background-color: #ffffff;
-    border: none;
-    vertical-align: middle;
-    padding: 10px 8px;
-    color: #333;
-  }
-
-  .tabla-rutas tr:hover td {
-    background-color: #f0f4f8;
-  }
 
   /* BOTONES DE ACCIÓN EN CELDA */
   .btn-icon {
@@ -113,40 +140,77 @@
     background-color: #bd2130;
   }
 
-  /* RESPONSIVE */
-  @media (max-width: 767px) {
-    .tabla-rutas {
-      font-size: 0.85rem;
-    }
 
-    .tabla-rutas th,
-    .tabla-rutas td {
-      padding: 8px 5px;
-    }
+  .table-title {
+    position: sticky;
+    top: 0;
+    z-index: 10;
+    background-color: #e6ebef;
+    padding: 12px 16px;
+    border-bottom: 1px solid #d2d6da;
+  }
 
-    .btn-icon {
-      padding: 5px 6px;
-      font-size: 0.75rem;
-    }
 
-    .table-title {
-      flex-direction: column;
-      align-items: flex-start;
-      gap: 8px;
-    }
+  .ruta-card {
+    transition: all 0.3s ease-in-out;
+    border-radius: 12px;
+  }
 
-    .table-title .btn-group {
-      width: 100%;
-      display: flex;
-      justify-content: flex-start;
-      gap: 6px;
-    }
+  .ruta-card:hover {
+    box-shadow: 0 6px 20px rgba(0, 0, 0, 0.15);
+    transform: translateY(-3px);
+  }
+</style>
 
-    .table-title .input-group {
-      width: 100%;
+<style>
+  .ruta-card {
+    transition: all 0.3s ease-in-out;
+    border: 1px solid #ddd;
+    border-radius: 12px;
+    background-color: #fff;
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+  }
+
+  .ruta-card:hover {
+    box-shadow: 0 6px 20px rgba(0, 0, 0, 0.1);
+    transform: translateY(-3px);
+  }
+
+  .ruta-card .card-title {
+    font-size: 1rem;
+    font-weight: bold;
+    color: #333;
+  }
+
+  .ruta-card p {
+    margin-bottom: 0.5rem;
+    font-size: 0.9rem;
+    color: #444;
+  }
+
+  .ruta-card button {
+    min-width: 36px;
+    height: 36px;
+  }
+
+  @media (max-width: 991px) {
+    .col-lg-4 {
+      flex: 0 0 50%;
+      max-width: 50%;
+    }
+  }
+
+  @media (max-width: 768px) {
+    .col-lg-4 {
+      flex: 0 0 100%;
+      max-width: 100%;
     }
   }
 </style>
+
 
 
 
@@ -200,48 +264,77 @@
     {% endif %}
     {% set _ = rutas_por_conductor[conductor].append(ruta) %}
     {% endfor %}
-    <!-- Tabla de rutas -->
-    <div class="table-responsive shadow-sm">
-      <table class="table table-bordered align-middle text-center tabla-rutas">
-        <thead>
-          <tr>
-            <th>Conductor</th>
-            <th>Fecha</th>
-            <th>Vehículo</th>
-            <th>Ruta</th>
-            <th>Salida</th>
-            <th>Llegada</th>
-            <th>Duración</th>
-            <th>Acciones</th>
-          </tr>
-        </thead>
-        <tbody>
-          {% for conductor, rutas_del_conductor in rutas_por_conductor.items() %}
-          {% for ruta in rutas_del_conductor %}
-          <tr>
-            <td><strong>{{ conductor }}</strong></td>
-            <td>{{ ruta.fecha }}</td>
-            <td>{{ ruta.vehiculo }}</td>
-            <td>{{ ruta.origen }} → {{ ruta.destino }}</td>
-            <td>{{ ruta.hora_salida }}</td>
-            <td>{{ ruta.hora_llegada or '-' }}</td>
-            <td>{{ ruta.duracion }}</td>
-            <td>
-              <div class="d-flex justify-content-center gap-2">
-                <button class="btn btn-icon btn-editar" title="Editar">
-                  <i class="fas fa-pen"></i>
-                </button>
-                <button class="btn btn-icon btn-eliminar" title="Eliminar">
-                  <i class="fas fa-trash-alt"></i>
-                </button>
-              </div>
-            </td>
-          </tr>
-          {% endfor %}
-          {% endfor %}
-        </tbody>
-      </table>
+    {% for conductor, rutas_del_conductor in rutas_por_conductor.items() %}
+    <div class="mb-5">
+      <h5 class="mb-3"><i class="fas fa-user me-2 text-primary"></i><strong>{{ conductor }}</strong></h5>
+
+      <div class="row g-4">
+        {% for ruta in rutas_del_conductor %}
+        <div class="col-lg-4 col-md-6 col-sm-12">
+          <div class="card ruta-card shadow-sm p-3 mb-4 rounded">
+            <h5 class="card-title">
+              <i class="fas fa-route text-success me-2"></i>
+              Ruta:
+              {{ ruta.origen if ruta.origen else "Por confirmar vía GPS" }}
+              → {{ ruta.destino }}
+            </h5>
+
+            <p class="mb-2">
+              <i class="fas fa-calendar-alt text-primary me-2"></i>
+              <strong>Fecha:</strong> {{ ruta.fecha }}
+            </p>
+
+            <p class="mb-2">
+              <i class="fas fa-car-side text-danger me-2"></i>
+              <strong>Vehículo:</strong> {{ ruta.vehiculo }}
+            </p>
+
+            <p class="mb-2">
+              <i class="fas fa-sign-out-alt text-warning me-2"></i>
+              <strong>Salida:</strong>
+              {{ ruta.hora_salida.strftime('%H:%M') if ruta.hora_salida else "Aún no parte el vehículo" }}
+            </p>
+
+            <p class="mb-2">
+              <i class="fas fa-sign-in-alt text-info me-2"></i>
+              <strong>Llegada:</strong>
+              {{ ruta.hora_llegada.strftime('%H:%M') if ruta.hora_llegada else "No registrada" }}
+            </p>
+
+            <p class="mb-3">
+              <i class="fas fa-clock text-secondary me-2"></i>
+              <strong>Duración:</strong>
+              {{ ruta.duracion if ruta.duracion else "No disponible" }}
+            </p>
+
+            <div class="d-flex justify-content-end gap-2">
+              {% if not ruta.hora_salida %}
+              <button class="btn btn-success btn-sm btnEditarRuta" data-id="{{ ruta.id }}"
+                data-conductor="{{ ruta.id_persona }}" data-vehiculo="{{ ruta.id_vehiculo }}"
+                data-destino="{{ ruta.destino }}" data-lat="{{ ruta.destino_lat }}" data-lon="{{ ruta.destino_lon }}"
+                data-fecha="{{ ruta.fecha }}">
+                <i class="fas fa-pen"></i>
+              </button>
+              <button class="btn btn-danger btn-sm" id="btnEliminarRuta" data-id="{{ ruta.id }}">
+                <i class="fas fa-trash-alt"></i>
+              </button>
+              {% else %}
+              <button class="btn btn-secondary btn-sm" disabled title="La ruta ya fue iniciada">
+                <i class="fas fa-lock"></i>
+              </button>
+              {% endif %}
+            </div>
+
+          </div>
+        </div>
+
+        {% endfor %}
+      </div>
     </div>
+    {% endfor %}
+
+
+
   </div>
 </div>
 
@@ -256,7 +349,7 @@
 
       <form id="formAsignarRuta">
         <div class="modal-body">
-          
+
           <!-- Conductor y Vehículo -->
           <div class="row mb-3">
             <div class="col-md-6">
@@ -273,9 +366,13 @@
               <select id="vehiculo" name="vehiculo" class="form-select" required>
                 <option value="">Seleccione</option>
                 {% for vehiculo in vehiculos %}
-                <option value="{{ vehiculo.id }}">{{ vehiculo.modelo }} - {{ vehiculo.placa }}</option>
+                <option value="{{ vehiculo.id }}" data-estado="{{ vehiculo.estado }}" {% if not vehiculo.estado
+                  %}disabled{% endif %}>
+                  {{ vehiculo.modelo }} - {{ vehiculo.placa }}{% if not vehiculo.estado %} (Ocupado){% endif %}
+                </option>
                 {% endfor %}
               </select>
+
             </div>
           </div>
 
@@ -296,17 +393,14 @@
               <label for="fecha">Fecha</label>
               <input type="date" class="form-control" id="fecha" name="fecha" required>
             </div>
-            <div class="col-md-6">
-              <label for="hora_salida">Hora de Salida</label>
-              <input type="time" class="form-control" id="hora_salida" name="hora_salida" required>
-            </div>
           </div>
 
           <!-- Info del origen automático -->
           <div class="row mt-3">
             <div class="col">
               <div class="alert alert-secondary text-center small">
-                📡 <strong>Nota:</strong> El punto de <strong>origen</strong> será capturado automáticamente desde el GPS del vehículo.
+                📡 <strong>Nota:</strong> El punto de <strong>origen</strong> será capturado automáticamente desde el
+                GPS del vehículo.
               </div>
             </div>
           </div>
@@ -324,23 +418,8 @@
   </div>
 </div>
 
-<script>
-  document.getElementById("formAsignarRuta").addEventListener("submit", async function (e) {
-    e.preventDefault();
-    const formData = new FormData(this);
-    const response = await fetch("/api/asignar_ruta", {
-      method: "POST",
-      body: formData
-    });
-    const result = await response.json();
-    if (result.success) {
-      alert("Ruta asignada correctamente.");
-      location.reload();
-    } else {
-      alert("Error: " + result.message);
-    }
-  });
-</script>
+
+
 <script>
   document.getElementById("buscadorRutas").addEventListener("input", function () {
     const query = this.value.toLowerCase();
@@ -436,6 +515,186 @@
     }
   });
 </script>
+<script>
+
+  document.addEventListener("DOMContentLoaded", function () {
+    alertify.set('notifier', 'position', 'bottom-right');
+    document.querySelectorAll("#btnEliminarRuta").forEach(btn => {
+      btn.addEventListener("click", function () {
+        const idRuta = this.dataset.id;
+        if (!confirm("¿Estás seguro de eliminar esta ruta?")) return;
+
+        fetch(`/api/ruta/${idRuta}`, {
+          method: "DELETE"
+        })
+          .then(res => res.json())
+          .then(data => {
+            if (data.success) {
+              alertify.success('✅ Ruta eliminada correctamente.');
+              setTimeout(() => location.reload(), 1200);
+            } else {
+              alertify.error('❌ Error al eliminar: ' + data.message);
+            }
+          })
+          .catch(error => {
+            console.error("Error:", error);
+            alertify.error("❌ Error al conectar con el servidor.");
+          });
+      });
+    });
+  });
+</script>
+<script>
+  let rutaEnEdicion = null;
+
+  // Establecer la fecha mínima (hoy) al cargar
+  document.addEventListener("DOMContentLoaded", function () {
+    const fechaInput = document.getElementById("fecha");
+    const hoy = new Date();
+    const yyyy = hoy.getFullYear();
+    const mm = String(hoy.getMonth() + 1).padStart(2, '0');
+    const dd = String(hoy.getDate()).padStart(2, '0');
+    const hoyStr = `${yyyy}-${mm}-${dd}`;
+    fechaInput.min = hoyStr;
+    fechaInput.value = hoyStr;
+  });
+
+  // Botón editar
+  document.querySelectorAll(".btnEditarRuta").forEach(btn => {
+    btn.addEventListener("click", function () {
+      rutaEnEdicion = this.dataset.id;
+
+      // Setear conductor
+      const conductorSelect = document.getElementById("conductor");
+      const idConductor = this.dataset.conductor;
+      for (let opt of conductorSelect.options) {
+        opt.selected = opt.value === idConductor;
+      }
+
+      // Setear vehículo, incluso si está ocupado
+      const vehiculoSelect = document.getElementById("vehiculo");
+      const idVehiculo = this.dataset.vehiculo;
+      if (!Array.from(vehiculoSelect.options).some(opt => opt.value === idVehiculo)) {
+        const nuevaOpcion = new Option("Vehículo actual (ocupado)", idVehiculo, true, true);
+        nuevaOpcion.disabled = true;
+        vehiculoSelect.add(nuevaOpcion);
+      } else {
+        for (let opt of vehiculoSelect.options) {
+          opt.selected = opt.value === idVehiculo;
+        }
+      }
+
+      // Setear otros campos
+      document.getElementById("destino_input").value = this.dataset.destino;
+      document.getElementById("destino_coords").value = `${this.dataset.lat},${this.dataset.lon}`;
+      document.getElementById("fecha").value = this.dataset.fecha;
+
+      // Mapa
+      if (typeof google !== "undefined" && mapaDestino && marcadorDestino && this.dataset.lat && this.dataset.lon) {
+        const lat = parseFloat(this.dataset.lat);
+        const lon = parseFloat(this.dataset.lon);
+        const pos = { lat: lat, lng: lon };
+        marcadorDestino.setPosition(pos);
+        mapaDestino.setCenter(pos);
+      }
+
+      // Cambiar título y botón
+      document.querySelector("#modalRuta .modal-title").textContent = "Editar Ruta";
+      const boton = document.querySelector("#formAsignarRuta button[type='submit']");
+      boton.innerHTML = `<i class="fas fa-save me-2"></i>Actualizar Ruta`;
+      boton.classList.remove("btn-success");
+      boton.classList.add("btn-primary");
+
+      // Mostrar modal
+      new bootstrap.Modal(document.getElementById("modalRuta")).show();
+    });
+  });
+
+  // Enviar formulario (crear o editar)
+  document.getElementById("formAsignarRuta").addEventListener("submit", async function (e) {
+    e.preventDefault();
+
+    const conductor = document.getElementById("conductor").value;
+    const vehiculo = document.getElementById("vehiculo").value;
+    const destino = document.getElementById("destino_input").value.trim();
+    const coords = document.getElementById("destino_coords").value.trim();
+    const fecha = document.getElementById("fecha").value;
+
+    if (!conductor || !vehiculo || !destino || !coords || !fecha) {
+      alertify.error("⚠️ Todos los campos son obligatorios.");
+      return;
+    }
+
+    const formData = new FormData(this);
+    const url = rutaEnEdicion ? `/api/ruta/${rutaEnEdicion}` : `/api/asignar_ruta`;
+    const method = rutaEnEdicion ? "PUT" : "POST";
+
+    try {
+      const response = await fetch(url, {
+        method: method,
+        body: formData
+      });
+
+      const result = await response.json();
+      if (result.success) {
+        alertify.success(rutaEnEdicion ? "✅ Ruta actualizada correctamente." : "✅ Ruta registrada.");
+        setTimeout(() => location.reload(), 1500);
+      } else {
+        alertify.error("❌ " + result.message);
+      }
+    } catch (err) {
+      console.error(err);
+      alertify.error("❌ Error de conexión al servidor.");
+    }
+  });
+
+  // Restaurar modal al cerrarse
+  document.getElementById("modalRuta").addEventListener("hidden.bs.modal", function () {
+    rutaEnEdicion = null;
+    document.getElementById("formAsignarRuta").reset();
+    document.getElementById("destino_coords").value = "";
+
+    // Restaurar fecha mínima por si es nuevo
+    const hoy = new Date();
+    const yyyy = hoy.getFullYear();
+    const mm = String(hoy.getMonth() + 1).padStart(2, '0');
+    const dd = String(hoy.getDate()).padStart(2, '0');
+    const hoyStr = `${yyyy}-${mm}-${dd}`;
+    const fechaInput = document.getElementById("fecha");
+    fechaInput.min = hoyStr;
+    fechaInput.value = hoyStr;
+
+    // Título y botón
+    document.querySelector("#modalRuta .modal-title").textContent = "Asignar Nueva Ruta";
+    const boton = document.querySelector("#formAsignarRuta button[type='submit']");
+    boton.innerHTML = `<i class="fas fa-save me-2"></i>Guardar Ruta`;
+    boton.classList.remove("btn-primary");
+    boton.classList.add("btn-success");
+
+    // Eliminar vehículo temporal si lo había
+    const vehiculoSelect = document.getElementById("vehiculo");
+    Array.from(vehiculoSelect.options).forEach(opt => {
+      if (opt.text.includes("ocupado") && opt.disabled) {
+        opt.remove();
+      }
+    });
+  });
+</script>
+
+
+
+
+
+<!-- jQuery requerido por Foundation -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/2.1.3/jquery.min.js"></script>
+
+<!-- JS de Foundation -->
+<script src="https://cdn.jsdelivr.net/foundation/5.5.0/js/foundation.min.js"></script>
+
+<!-- JS de Alertify.js -->
+<script src="https://cdn.jsdelivr.net/npm/alertifyjs@1.13.1/build/alertify.min.js"></script>
+
+
 
 
 

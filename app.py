@@ -1,4 +1,4 @@
-from flask import Flask, render_template, request, redirect, flash, make_response, url_for, jsonify
+from flask import Flask, render_template, request, redirect, flash, make_response, url_for, jsonify 
 from flask_jwt_extended import JWTManager, create_access_token, set_access_cookies, unset_jwt_cookies, jwt_required, get_jwt_identity, exceptions
 import hashlib
 import os
@@ -8,6 +8,12 @@ import controladores.controlador_usuarios as controlador_usuarios
 import controladores.controlador_vehiculo as controlador_vehiculo
 import controladores.controlador_rutas as controlador_rutas
 from bd_conexion import obtener_conexion
+import requests
+from datetime import datetime
+from datetime import date
+import serial
+
+from pytz import timezone, utc
 
 from controladores.controlador_vehiculo import agregar_vehiculo, obtener_vehiculos
 from werkzeug.security import check_password_hash
@@ -257,17 +263,28 @@ def api_eliminar_vehiculo(id_vehiculo):
         return jsonify({"success": False, "message": f"Error inesperado: {str(e)}"}), 500
 
 
-# MAPA EN TIEMPO REAL
 @app.route("/mapa_flotas")
 @jwt_required()
 def mapa_flotas():
     dni_usuario = get_jwt_identity()
     usuario = controlador_usuarios.obtener_usuario(dni_usuario)
+
+    rutas = controlador_rutas.obtener_rutas_programadas()
+    hoy = date.today()
+
+    # Filtra rutas por fecha actual
+    rutas_hoy = [r for r in rutas if r["fecha"] == hoy]
+
     breadcrumbs = [
         {"name": "Inicio", "url": "/"},
         {"name": "Mapa", "url": "/mapa_flotas"}
     ]
-    return render_template("mapa_flotas.html", usuario=usuario, breadcrumbs=breadcrumbs)
+    return render_template(
+        "mapa_flotas.html",
+        usuario=usuario,
+        rutas_hoy=rutas_hoy,
+        breadcrumbs=breadcrumbs
+    )
 
 
 
@@ -276,9 +293,11 @@ def mapa_flotas():
 def rutas_programadas():
     dni_usuario = get_jwt_identity()
     usuario = controlador_usuarios.obtener_usuario(dni_usuario)
+    rutas = controlador_rutas.obtener_rutas_programadas()
     conductores = controlador_rutas.obtener_todos_los_conductores()
-    vehiculos = controlador_rutas.obtener_vehiculos_disponibles()
-    rutas = controlador_rutas.obtener_rutas_programadas()  # Asumiendo que ya tienes esta función
+
+    # Traer todos los vehículos (sin filtrar por estado)
+    vehiculos = controlador_rutas.obtener_todos_los_vehiculos_con_estado()
 
     breadcrumbs = [
         {"name": "Inicio", "url": "/"},
@@ -294,6 +313,8 @@ def rutas_programadas():
 
 
 
+
+
 @app.route("/api/asignar_ruta", methods=["POST"])
 @jwt_required()
 def api_asignar_ruta():
@@ -302,12 +323,11 @@ def api_asignar_ruta():
 
         id_persona = int(data.get("conductor"))
         id_vehiculo = int(data.get("vehiculo"))
-        destino_completo = data.get("destino")  # Lo que viene del input destino
+        destino_completo = data.get("destino")
         destino_coords = data.get("destino_coords")
         fecha = data.get("fecha")
-        hora_salida = data.get("hora_salida")
 
-        if not all([id_persona, id_vehiculo, destino_completo, destino_coords, fecha, hora_salida]):
+        if not all([id_persona, id_vehiculo, destino_completo, destino_coords, fecha]):
             return jsonify({"success": False, "message": "Faltan campos requeridos"}), 400
 
         try:
@@ -315,8 +335,7 @@ def api_asignar_ruta():
         except Exception:
             return jsonify({"success": False, "message": "Coordenadas de destino inválidas"}), 400
 
-        # Puedes usar la dirección completa como 'destino' si ya no usas la corta
-        destino = destino_completo  # o .split(",")[0] si quieres solo la calle
+        destino = destino_completo
 
         success, msg, _ = controlador_rutas.registrar_ruta_y_asignacion(
             id_persona=id_persona,
@@ -324,8 +343,7 @@ def api_asignar_ruta():
             destino=destino,
             destino_lat=destino_lat,
             destino_lon=destino_lon,
-            fecha=fecha,
-            hora_salida=hora_salida
+            fecha=fecha
         )
 
         if success:
@@ -335,26 +353,75 @@ def api_asignar_ruta():
 
     except Exception as e:
         return jsonify({"success": False, "message": f"Error: {str(e)}"}), 500
+    
+@app.route("/api/ruta/<int:id_ruta>", methods=["DELETE"])
+@jwt_required()
+def eliminar_ruta_api(id_ruta):
+    try:
+        success, msg = controlador_rutas.eliminar_ruta(id_ruta)
+        if success:
+            return jsonify({"success": True, "message": msg}), 200
+        else:
+            return jsonify({"success": False, "message": msg}), 500
+    except Exception as e:
+        return jsonify({"success": False, "message": str(e)}), 500
 
 
+@app.route("/api/ruta/<int:id_ruta>", methods=["PUT"])
+@jwt_required()
+def editar_ruta_api(id_ruta):
+    try:
+        data = request.form
+
+        id_persona = int(data.get("conductor"))
+        id_vehiculo = int(data.get("vehiculo"))
+        destino = data.get("destino")
+        destino_coords = data.get("destino_coords")
+        fecha = data.get("fecha")
+
+        if not all([id_persona, id_vehiculo, destino, destino_coords, fecha]):
+            return jsonify({"success": False, "message": "Faltan campos requeridos"}), 400
+
+        try:
+            destino_lat, destino_lon = map(float, destino_coords.split(","))
+        except ValueError:
+            return jsonify({"success": False, "message": "Coordenadas inválidas"}), 400
+
+        success, msg = controlador_rutas.editar_ruta(
+            id_ruta=id_ruta,
+            id_persona=id_persona,
+            id_vehiculo=id_vehiculo,
+            destino=destino,
+            destino_lat=destino_lat,
+            destino_lon=destino_lon,
+            fecha=fecha
+        )
+
+        if success:
+            return jsonify({"success": True, "message": msg}), 200
+        else:
+            return jsonify({"success": False, "message": msg}), 500
+
+    except Exception as e:
+        return jsonify({"success": False, "message": str(e)}), 500
+
+## APIS PARA REPUESTAS DEL MODULO SIM 808 
 
 @app.route("/api/ruta-actual", methods=["GET"])
 def obtener_ruta_actual():
-    id_vehiculo = request.args.get("id_vehiculo")
     conexion = obtener_conexion()
     try:
         with conexion.cursor() as cursor:
             cursor.execute("""
                 SELECT arc.id_ruta
                 FROM asignacion_ruta_conductor arc
-                JOIN rutas_programadas rp ON arc.id_ruta = rp.id
-                WHERE arc.id_vehiculo = %s AND arc.estado = 'Activa'
+                WHERE arc.estado_envio = 'vehiculo_iniciar'
                 ORDER BY arc.asignado_en DESC
                 LIMIT 1;
-            """, (id_vehiculo,))
+            """)
             resultado = cursor.fetchone()
             if resultado:
-                return jsonify({"id_ruta": resultado[0]})
+                return jsonify({"id_ruta": resultado[0]}), 200
             else:
                 return jsonify({"id_ruta": None}), 404
     except Exception as e:
@@ -362,39 +429,145 @@ def obtener_ruta_actual():
     finally:
         conexion.close()
 
+        
+
+@app.route("/api/marcar_ruta_activa", methods=["POST"])
+def marcar_ruta_activa():
+    try:
+        data = request.get_json()
+        id_ruta = data.get("id_ruta")
+
+        if not id_ruta:
+            return jsonify({"success": False, "message": "Falta el id_ruta"}), 400
+
+        conexion = obtener_conexion()
+        with conexion.cursor() as cursor:
+            # Limpiar cualquier ruta que ya esté marcada para el SIM
+            cursor.execute("""
+                UPDATE asignacion_ruta_conductor
+                SET estado_envio = NULL
+                WHERE estado_envio = 'vehiculo_iniciar';
+            """)
+
+            # Establecer esta ruta como la que debe iniciar el SIM
+            cursor.execute("""
+                UPDATE asignacion_ruta_conductor
+                SET estado_envio = 'vehiculo_iniciar'
+                WHERE id_ruta = %s;
+            """, (id_ruta,))
+
+        conexion.commit()
+        return jsonify({"success": True, "message": "Ruta lista para el SIM"}), 200
+
+    except Exception as e:
+        print("❌ Error al marcar ruta activa:", str(e))
+        return jsonify({"success": False, "message": str(e)}), 500
+
+    finally:
+        conexion.close()
+
+
+
+
+
+
+def obtener_direccion_desde_coordenadas(lat, lon):
+    try:
+        url = f"https://nominatim.openstreetmap.org/reverse?lat={lat}&lon={lon}&format=json"
+        headers = {'User-Agent': 'sim808-tracker'}
+        response = requests.get(url, headers=headers)
+        if response.status_code == 200:
+            data = response.json()
+            return data.get("display_name", f"Lat: {lat}, Lon: {lon}")
+        else:
+            return f"Lat: {lat}, Lon: {lon}"
+    except Exception as e:
+        print("❌ Error obteniendo dirección:", str(e))
+        return f"Lat: {lat}, Lon: {lon}"
+
+def formatear_rutas_hora_lima(rutas):
+    lima = timezone("America/Lima")
+    for r in rutas:
+        if r.get("hora_salida"):
+            r["hora_salida"] = r["hora_salida"].astimezone(lima)
+    return rutas
+
+
 @app.route("/api/registrar_origen_gps", methods=["POST"], strict_slashes=False)
 def registrar_origen_gps():
-    data = request.get_json()
+    print("📥 Headers recibidos:")
+    for key, value in request.headers.items():
+        print(f"{key}: {value}")
+
+    print("\n📥 Cuerpo crudo recibido (request.data):")
+    print(request.data)
+
+    try:
+        raw = request.data.decode("utf-8").replace('\x1a', '')
+        data = json.loads(raw)
+    except Exception as e:
+        print("❌ No se pudo procesar el JSON:", e)
+        return jsonify({"error": "JSON inválido"}), 400
+
     print("📦 Payload recibido:", data)
 
     try:
-        id_ruta = int(data.get("id_ruta"))       # <- convertir a entero
-        lat = float(data.get("lat"))             # <- convertir a decimal
+        id_ruta = int(data.get("id_ruta"))
+        lat = float(data.get("lat"))
         lon = float(data.get("lon"))
-    except (TypeError, ValueError):
+        hora_str = data.get("hora", "").strip()
+
+        if not hora_str:
+            print("❌ El campo 'hora' está vacío o ausente.")
+            return jsonify({"error": "Campo 'hora' es obligatorio"}), 400
+
+        print(f"🕒 Hora recibida: {hora_str}")
+        if len(hora_str) < 14:
+            return jsonify({"error": "Formato de hora incompleto"}), 400
+
+        hora_sim = datetime.strptime(hora_str[:14], "%Y%m%d%H%M%S")
+        hora_utc = utc.localize(hora_sim)
+        hora_lima = hora_utc.astimezone(timezone("America/Lima"))
+
+    except (TypeError, ValueError) as e:
+        print("❌ Error procesando datos:", str(e))
         return jsonify({"error": "Datos inválidos"}), 400
 
-    direccion = f"Lat: {lat}, Lon: {lon}"
+    direccion = obtener_direccion_desde_coordenadas(lat, lon)
 
     conexion = obtener_conexion()
     try:
         with conexion.cursor() as cursor:
+            # Actualizar datos en rutas_programadas
             cursor.execute("""
                 UPDATE rutas_programadas
                 SET origen = %s,
                     origen_lat = %s,
-                    origen_lon = %s
+                    origen_lon = %s,
+                    hora_salida = %s
                 WHERE id = %s;
-            """, (direccion, lat, lon, id_ruta))
+            """, (direccion, lat, lon, hora_lima, id_ruta))
+            cursor.execute("""
+                UPDATE asignacion_ruta_conductor
+                SET estado_envio = 'vehiculo_iniciado'
+                WHERE id_ruta = %s;
+            """, (id_ruta,))
+
         conexion.commit()
-        print(f"✅ Ruta {id_ruta} actualizada correctamente.")
-        return jsonify({"success": True, "message": "Origen actualizado"}), 200
+        print(f"✅ Ruta {id_ruta} actualizada y estado_envio marcado como 'vehiculo_iniciado'.")
+        return jsonify({
+            "success": True,
+            "message": "Origen actualizado y estado_envio modificado",
+            "hora_salida": hora_lima.isoformat()
+        }), 200
+
     except Exception as e:
         conexion.rollback()
-        print("❌ Error al actualizar:", str(e))
+        print("❌ Error al actualizar en BD:", str(e))
         return jsonify({"success": False, "message": str(e)}), 500
     finally:
         conexion.close()
+
 
 
 

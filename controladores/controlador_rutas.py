@@ -1,6 +1,6 @@
 from bd_conexion import obtener_conexion
 
-def registrar_ruta_y_asignacion(id_persona, id_vehiculo, destino_lat, destino_lon, destino, fecha, hora_salida):
+def registrar_ruta_y_asignacion(id_persona, id_vehiculo, destino_lat, destino_lon, destino, fecha):
     conexion = obtener_conexion()
     try:
         if not destino_lat or not destino_lon or not destino:
@@ -10,11 +10,11 @@ def registrar_ruta_y_asignacion(id_persona, id_vehiculo, destino_lat, destino_lo
             cursor.execute("""
                 INSERT INTO rutas_programadas (
                     destino, destino_lat, destino_lon,
-                    fecha, hora_salida
+                    fecha
                 )
-                VALUES (%s, %s, %s, %s, %s)
+                VALUES (%s, %s, %s, %s)
                 RETURNING id;
-            """, (destino, destino_lat, destino_lon, fecha, hora_salida))
+            """, (destino, destino_lat, destino_lon, fecha))
             
             id_ruta = cursor.fetchone()[0]
 
@@ -36,6 +36,7 @@ def registrar_ruta_y_asignacion(id_persona, id_vehiculo, destino_lat, destino_lo
 
 
 
+
 def obtener_todos_los_conductores():
     conexion = obtener_conexion()
     try:
@@ -53,22 +54,67 @@ def obtener_todos_los_conductores():
     finally:
         conexion.close()
 
-def obtener_vehiculos_disponibles():
+def obtener_vehiculos_disponibles(id_vehiculo_asignado=None):
     conexion = obtener_conexion()
     try:
         with conexion.cursor() as cursor:
-            cursor.execute("""
-                SELECT id, modelo, placa
-                FROM vehiculos
-                WHERE estado = TRUE
-                ORDER BY modelo
-            """)
+            if id_vehiculo_asignado:
+                cursor.execute("""
+                    SELECT id, modelo, placa
+                    FROM vehiculos
+                    WHERE estado = TRUE OR id = %s
+                    ORDER BY modelo;
+                """, (id_vehiculo_asignado,))
+            else:
+                cursor.execute("""
+                    SELECT id, modelo, placa
+                    FROM vehiculos
+                    WHERE estado = TRUE
+                    ORDER BY modelo;
+                """)
             return [{"id": v[0], "modelo": v[1], "placa": v[2]} for v in cursor.fetchall()]
     except Exception as e:
         print("Error al obtener vehículos:", e)
         return []
     finally:
         conexion.close()
+        
+def obtener_vehiculo_por_id(id_vehiculo):
+    conexion = obtener_conexion()
+    try:
+        with conexion.cursor() as cursor:
+            cursor.execute("""
+                SELECT id, modelo, placa
+                FROM vehiculos
+                WHERE id = %s
+            """, (id_vehiculo,))
+            fila = cursor.fetchone()
+            if fila:
+                return {"id": fila[0], "modelo": fila[1], "placa": fila[2]}
+            return None
+    except Exception as e:
+        print("Error al obtener vehículo:", e)
+        return None
+    finally:
+        conexion.close()
+
+def obtener_todos_los_vehiculos_con_estado():
+    conexion = obtener_conexion()
+    try:
+        with conexion.cursor() as cursor:
+            cursor.execute("""
+                SELECT id, modelo, placa, estado
+                FROM vehiculos
+                ORDER BY modelo
+            """)
+            return [{"id": v[0], "modelo": v[1], "placa": v[2], "estado": v[3]} for v in cursor.fetchall()]
+    except Exception as e:
+        print("Error al obtener vehículos:", e)
+        return []
+    finally:
+        conexion.close()
+
+
 
 def obtener_rutas_programadas():
     conexion = obtener_conexion()
@@ -88,6 +134,8 @@ def obtener_rutas_programadas():
                     rp.fecha,
                     rp.hora_salida,
                     rp.hora_llegada,
+                    arc.id_persona,
+                    arc.id_vehiculo,
                     CONCAT(p.nombre, ' ', p.apellido) AS conductor,
                     CONCAT(v.modelo, ' - ', v.placa) AS vehiculo
                 FROM rutas_programadas rp
@@ -100,17 +148,19 @@ def obtener_rutas_programadas():
             for row in cursor.fetchall():
                 rutas.append({
                     "id": row[0],
-                    "origen": row[1],                   # Texto (opcional)
-                    "origen_lat": row[2],               # Coordenada (capturada por GPS)
+                    "origen": row[1],
+                    "origen_lat": row[2],
                     "origen_lon": row[3],
-                    "destino": row[4],                  # Texto (visible en UI)
-                    "destino_lat": row[5],              # Coordenadas desde mapa
+                    "destino": row[4],
+                    "destino_lat": row[5],
                     "destino_lon": row[6],
                     "fecha": row[7],
                     "hora_salida": row[8],
                     "hora_llegada": row[9],
-                    "conductor": row[10],
-                    "vehiculo": row[11],
+                    "id_persona": row[10],   # 👈 ahora disponibles
+                    "id_vehiculo": row[11],  # 👈 ahora disponibles
+                    "conductor": row[12],
+                    "vehiculo": row[13],
                     "duracion": calcular_duracion(row[8], row[9]) if row[9] else None
                 })
     except Exception as e:
@@ -119,6 +169,7 @@ def obtener_rutas_programadas():
         conexion.close()
 
     return rutas
+
 
 
 
@@ -136,3 +187,73 @@ def calcular_duracion(hora_salida, hora_llegada):
         return f"{horas}h {minutos}m"
     except:
         return "-"
+    
+def eliminar_ruta(id_ruta):
+    conexion = obtener_conexion()
+    try:
+        with conexion.cursor() as cursor:
+            # Primero se obtiene el vehículo asignado para liberarlo
+            cursor.execute("""
+                SELECT id_vehiculo FROM asignacion_ruta_conductor
+                WHERE id_ruta = %s
+            """, (id_ruta,))
+            vehiculo = cursor.fetchone()
+            if vehiculo:
+                id_vehiculo = vehiculo[0]
+                # Liberar vehículo (volver a estado disponible)
+                cursor.execute("""
+                    UPDATE vehiculos SET estado = TRUE WHERE id = %s
+                """, (id_vehiculo,))
+
+            # Eliminar asignación
+            cursor.execute("DELETE FROM asignacion_ruta_conductor WHERE id_ruta = %s", (id_ruta,))
+            # Eliminar ruta
+            cursor.execute("DELETE FROM rutas_programadas WHERE id = %s", (id_ruta,))
+        
+        conexion.commit()
+        return True, "Ruta eliminada correctamente"
+    except Exception as e:
+        conexion.rollback()
+        return False, str(e)
+    finally:
+        conexion.close()
+
+
+def editar_ruta(id_ruta, id_persona, id_vehiculo, destino_lat, destino_lon, destino, fecha):
+    conexion = obtener_conexion()
+    try:
+        with conexion.cursor() as cursor:
+            # Actualizar tabla rutas_programadas
+            cursor.execute("""
+                UPDATE rutas_programadas
+                SET destino = %s,
+                    destino_lat = %s,
+                    destino_lon = %s,
+                    fecha = %s
+                WHERE id = %s;
+            """, (destino, destino_lat, destino_lon, fecha, id_ruta))
+
+            # Obtener el vehículo anterior
+            cursor.execute("SELECT id_vehiculo FROM asignacion_ruta_conductor WHERE id_ruta = %s", (id_ruta,))
+            vehiculo_anterior = cursor.fetchone()
+            if vehiculo_anterior:
+                cursor.execute("UPDATE vehiculos SET estado = TRUE WHERE id = %s", (vehiculo_anterior[0],))
+
+            # Actualizar asignación (persona y vehículo)
+            cursor.execute("""
+                UPDATE asignacion_ruta_conductor
+                SET id_persona = %s,
+                    id_vehiculo = %s
+                WHERE id_ruta = %s;
+            """, (id_persona, id_vehiculo, id_ruta))
+
+            # Marcar el nuevo vehículo como ocupado
+            cursor.execute("UPDATE vehiculos SET estado = FALSE WHERE id = %s", (id_vehiculo,))
+        
+        conexion.commit()
+        return True, "Ruta actualizada correctamente"
+    except Exception as e:
+        conexion.rollback()
+        return False, str(e)
+    finally:
+        conexion.close()
