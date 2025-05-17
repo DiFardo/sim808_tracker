@@ -50,7 +50,7 @@ def procesar_login():
         usuario = controlador_usuarios.obtener_usuario(dni_usuario)
         if not usuario:
             
-            return redirect("/index")
+            return redirect("/login_user")
 
         hash_guardado = usuario[2]  # campo `pass`
         if check_password_hash(hash_guardado, password):
@@ -60,7 +60,7 @@ def procesar_login():
             return resp
         else:
             flash("Contraseña incorrecta.")
-            return redirect("/login_user")
+            return redirect("/index")
     except Exception as e:
         flash(f"Ocurrió un error: {str(e)}")
         return redirect("/login_user")
