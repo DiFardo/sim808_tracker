@@ -1,0 +1,50 @@
+# Entorno virtual
+venv/
+.venv/
+env/
+ENV/
+
+# Archivos Python bytecode
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Archivos de configuración y variables de entorno
+*.env
+.env.*
+*.cfg
+instance/
+
+# Archivos de logs y temporales
+*.log
+*.tmp
+*.bak
+
+# Configuraciones de IDEs
+.vscode/
+.idea/
+
+# Archivos de pruebas y cache
+.pytest_cache/
+.mypy_cache/
+.tox/
+.cache/
+coverage.xml
+htmlcov/
+
+# Archivos del sistema operativo
+.DS_Store
+Thumbs.db
+
+# Archivos de distribución
+dist/
+build/
+*.egg-info/
+
+# Base de datos PostgreSQL (solo si haces dump local)
+*.sql
+*.dump
+
+# Archivos estáticos temporales
+static/uploads/
+static/*.tmp
