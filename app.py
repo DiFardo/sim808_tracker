@@ -49,8 +49,8 @@ def procesar_login():
 
         usuario = controlador_usuarios.obtener_usuario(dni_usuario)
         if not usuario:
-            flash("Usuario no encontrado.")
-            return redirect("/login_user")
+            
+            return redirect("/index")
 
         hash_guardado = usuario[2]  # campo `pass`
         if check_password_hash(hash_guardado, password):
