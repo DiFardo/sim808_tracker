@@ -3,415 +3,242 @@
 {% block titulo %}Admin Panel{% endblock %}
 
 {% block link %}
-<link rel="preconnect" href="https://fonts.gstatic.com">
-<link rel="shortcut icon" href="img/icons/icon-48x48.png" />
-<link rel="canonical" href="https://demo-basic.adminkit.io/" />
-<title>Bootstrap Admin Template</title>
+<link rel="preconnect" href="https://fonts.gstatic.com" />
+<link href="{{ url_for('static', filename='css/app.css') }}" rel="stylesheet" />
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600&display=swap" rel="stylesheet" />
+<title>Sistema de monitoreo</title>
 
-<link href="{{ url_for('static', filename='css/app.css') }}" rel="stylesheet">
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600&display=swap" rel="stylesheet">
+<style>
+  /* Estilos generales para cartas */
+  .card {
+    border-radius: 12px;
+    box-shadow: 0 4px 12px rgb(0 0 0 / 0.1);
+    transition: box-shadow 0.3s ease, transform 0.3s ease;
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    background: #fff;
+  }
+  .card:hover {
+    box-shadow: 0 10px 30px rgb(0 0 0 / 0.15);
+    transform: translateY(-6px);
+  }
+  .stat {
+    font-size: 3rem;
+    color: #1e40af;
+  }
+  .card-title {
+    font-weight: 600;
+    color: #374151;
+    margin-bottom: 0.5rem;
+  }
+  .text-muted {
+    font-size: 0.9rem;
+    color: #6b7280;
+  }
+  .flotas-info {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+  }
+  .flotas-info h1 {
+    font-size: 3rem;
+    font-weight: 700;
+    color: #111827;
+  }
+  .flotas-info .status {
+    margin-top: 0.5rem;
+    font-weight: 600;
+  }
+  .flotas-info .status span {
+    padding: 6px 12px;
+    border-radius: 20px;
+    font-size: 0.95rem;
+    color: #fff;
+    margin-right: 8px;
+  }
+  .status-disponible {
+    background-color: #10b981;
+  }
+  .status-no-disponible {
+    background-color: #ef4444;
+  }
+  .card-body.scrollable {
+    max-height: 320px;
+    overflow-y: auto;
+  }
+  @media (max-width: 576px) {
+    .card-body > .d-flex {
+      flex-direction: column;
+      align-items: flex-start !important;
+    }
+    .card-body > .d-flex > div + div {
+      margin-top: 0.5rem;
+    }
+  }
+  .list-group-item {
+    font-weight: 500;
+    font-size: 1rem;
+  }
+  .badge {
+    font-size: 1rem;
+    padding: 0.35em 0.8em;
+  }
+</style>
 {% endblock %}
+
 {% block contenido %}
 <div id="content">
-	<div class="main-content">
-		<h1 class="h3 mb-3"><strong>Analytics</strong> Dashboard</h1>
-		<div class="row">
-			<div class="col-xl-6 col-xxl-5 d-flex">
-				<div class="w-100">
-					<div class="row">
-						<div class="col-sm-6">
-							<div class="card">
-								<div class="card-body">
-									<div class="row">
-										<div class="col mt-0">
-											<h5 class="card-title">Sales</h5>
-										</div>
+  <div class="main-content">
+    <h1 class="h3 mb-4"><strong>Analytics</strong> Dashboard</h1>
 
-										<div class="col-auto">
-											<div class="stat text-primary">
-												<i class="align-middle" data-feather="truck"></i>
-											</div>
-										</div>
-									</div>
-									<h1 class="mt-1 mb-3">2.382</h1>
-									<div class="mb-0">
-										<span class="text-danger">-3.65%</span>
-										<span class="text-muted">Since last week</span>
-									</div>
-								</div>
-							</div>
-							<div class="card">
-								<div class="card-body">
-									<div class="row">
-										<div class="col mt-0">
-											<h5 class="card-title">Visitors</h5>
-										</div>
+    <!-- PRIMERA FILA: 3 cartas -->
+    <div class="row g-4 mb-4">
+      <div class="col-sm-12 col-md-6 col-lg-4">
+        <div class="card p-4 d-flex align-items-center">
+          <i data-feather="truck" class="stat mb-3"></i>
+          <div class="flotas-info text-center">
+            <h5 class="card-title">Flotas Totales</h5>
+            <h1>{{ cantidad_flotas + cantidad_flotas_inactivas }}</h1>
+            <div>
+              <span class="status status-disponible">Disponibles: {{ cantidad_flotas }}</span>
+              <span class="status status-no-disponible">No disponibles: {{ cantidad_flotas_inactivas }}</span>
+            </div>
+          </div>
+        </div>
+      </div>
 
-										<div class="col-auto">
-											<div class="stat text-primary">
-												<i class="align-middle" data-feather="users"></i>
-											</div>
-										</div>
-									</div>
-									<h1 class="mt-1 mb-3">14.212</h1>
-									<div class="mb-0">
-										<span class="text-success">5.25%</span>
-										<span class="text-muted">Since last week</span>
-									</div>
-								</div>
-							</div>
-						</div>
-						<div class="col-sm-6">
-							<div class="card">
-								<div class="card-body">
-									<div class="row">
-										<div class="col mt-0">
-											<h5 class="card-title">Earnings</h5>
-										</div>
+      <div class="col-sm-12 col-md-6 col-lg-4">
+        <div class="card">
+          <div class="card-body scrollable">
+            <h5 class="card-title mb-3">Rutas Programadas Hoy</h5>
+            {% if rutas_hoy|length == 0 %}
+              <p class="text-muted">No hay rutas programadas para hoy.</p>
+            {% else %}
+              <ul class="list-group">
+                {% for ruta in rutas_hoy %}
+                  <li class="list-group-item">
+                    <strong>{{ ruta.conductor }}</strong> = {{ ruta.origen }} &rarr; {{ ruta.destino }}
+                  </li>
+                {% endfor %}
+              </ul>
+            {% endif %}
+          </div>
+        </div>
+      </div>
 
-										<div class="col-auto">
-											<div class="stat text-primary">
-												<i class="align-middle" data-feather="dollar-sign"></i>
-											</div>
-										</div>
-									</div>
-									<h1 class="mt-1 mb-3">$21.300</h1>
-									<div class="mb-0">
-										<span class="text-success">6.65%</span>
-										<span class="text-muted">Since last week</span>
-									</div>
-								</div>
-							</div>
-							<div class="card">
-								<div class="card-body">
-									<div class="row">
-										<div class="col mt-0">
-											<h5 class="card-title">Orders</h5>
-										</div>
+      <div class="col-sm-12 col-md-6 col-lg-4">
+        <div class="card">
+          <div class="card-body scrollable">
+            <h5 class="card-title mb-3">Vehículos en Ruta</h5>
+            {% if vehiculos_en_ruta|length == 0 %}
+              <p class="text-muted">No hay vehículos asignados en ruta.</p>
+            {% else %}
+              <ul class="list-group">
+                {% for vehiculo in vehiculos_en_ruta %}
+                  <li class="list-group-item d-flex justify-content-between align-items-center">
+                    <span>{{ vehiculo.placa }}</span>
+                    <span class="badge bg-primary rounded-pill">{{ vehiculo.cantidad_asignada }}</span>
+                  </li>
+                {% endfor %}
+              </ul>
+            {% endif %}
+          </div>
+        </div>
+      </div>
+    </div>
 
-										<div class="col-auto">
-											<div class="stat text-primary">
-												<i class="align-middle" data-feather="shopping-cart"></i>
-											</div>
-										</div>
-									</div>
-									<h1 class="mt-1 mb-3">64</h1>
-									<div class="mb-0">
-										<span class="text-danger">-2.25%</span>
-										<span class="text-muted">Since last week</span>
-									</div>
-								</div>
-							</div>
-						</div>
-					</div>
-				</div>
-			</div>
+    <!-- SEGUNDA FILA: Gráfico y otra carta al lado -->
+    <div class="row g-4">
+      <div class="col-12 col-md-6 col-lg-6 col-xxl-4">
+        <div class="card flex-fill w-100">
+          <div class="card-header">
+            <h5 class="card-title mb-0">Días con Más Rutas Programadas</h5>
+          </div>
+          <div class="card-body" style="min-height: 320px;">
+            <canvas id="chart-rutas-dias" style="max-height: 250px;"></canvas>
+            <ul class="mt-3 list-unstyled">
+              {% for dia in dias_top_rutas %}
+              <li>
+                <strong>{{ dia.fecha.strftime('%d %b %Y') }}</strong>: {{ dia.total_rutas }} rutas
+              </li>
+              {% endfor %}
+            </ul>
+          </div>
+        </div>
+      </div>
 
-			<div class="col-xl-6 col-xxl-7">
-				<div class="card flex-fill w-100">
-					<div class="card-header">
+      <div class="col-12 col-md-6 col-lg-6 col-xxl-4">
+        <div class="card flex-fill w-100">
+          <div class="card-body scrollable">
+            <h5 class="card-title mb-3">Conductores</h5>
+            {% if conductores_disponibles|length == 0 %}
+              <p class="text-muted">No hay conductores disponibles.</p>
+            {% else %}
+              <ul class="list-group">
+                {% for conductor in conductores_disponibles %}
+                  <li class="list-group-item d-flex justify-content-between align-items-center">
+                    {{ conductor.nombre }} {{ conductor.apellido }}
+                    {% if conductor.asignado %}
+                      <span class="badge bg-danger rounded-pill">Asignado</span>
+                    {% else %}
+                      <span class="badge bg-success rounded-pill">Disponible</span>
+                    {% endif %}
+                  </li>
+                {% endfor %}
+              </ul>
+            {% endif %}
+          </div>
+        </div>
+      </div>
+    </div>
 
-						<h5 class="card-title mb-0">Recent Movement</h5>
-					</div>
-					<div class="card-body py-3">
-						<div class="chart chart-sm">
-							<canvas id="chartjs-dashboard-line"></canvas>
-						</div>
-					</div>
-				</div>
-			</div>
-		</div>
-
-		<div class="row">
-			<div class="col-12 col-md-6 col-xxl-3 d-flex order-2 order-xxl-3">
-				<div class="card flex-fill w-100">
-					<div class="card-header">
-
-						<h5 class="card-title mb-0">Browser Usage</h5>
-					</div>
-					<div class="card-body d-flex">
-						<div class="align-self-center w-100">
-							<div class="py-3">
-								<div class="chart chart-xs">
-									<canvas id="chartjs-dashboard-pie"></canvas>
-								</div>
-							</div>
-
-							<table class="table mb-0">
-								<tbody>
-									<tr>
-										<td>Chrome</td>
-										<td class="text-end">4306</td>
-									</tr>
-									<tr>
-										<td>Firefox</td>
-										<td class="text-end">3801</td>
-									</tr>
-									<tr>
-										<td>IE</td>
-										<td class="text-end">1689</td>
-									</tr>
-								</tbody>
-							</table>
-						</div>
-					</div>
-				</div>
-			</div>
-			<div class="col-12 col-md-12 col-xxl-6 d-flex order-3 order-xxl-2">
-				<div class="card flex-fill w-100">
-					<div class="card-header">
-
-						<h5 class="card-title mb-0">Real-Time</h5>
-					</div>
-					<div class="card-body px-4">
-						<div id="world_map" style="height:350px;"></div>
-					</div>
-				</div>
-			</div>
-			<div class="col-12 col-md-6 col-xxl-3 d-flex order-1 order-xxl-1">
-				<div class="card flex-fill">
-					<div class="card-header">
-
-						<h5 class="card-title mb-0">Calendar</h5>
-					</div>
-					<div class="card-body d-flex">
-						<div class="align-self-center w-100">
-							<div class="chart">
-								<div id="datetimepicker-dashboard"></div>
-							</div>
-						</div>
-					</div>
-				</div>
-			</div>
-		</div>
-
-
-
-	</div>
+  </div>
 </div>
 {% endblock %}
 
 {% block script %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script src="https://unpkg.com/feather-icons"></script>
 <script>
-	document.addEventListener("DOMContentLoaded", function() {
-		var ctx = document.getElementById("chartjs-dashboard-line").getContext("2d");
-		var gradient = ctx.createLinearGradient(0, 0, 0, 225);
-		gradient.addColorStop(0, "rgba(215, 227, 244, 1)");
-		gradient.addColorStop(1, "rgba(215, 227, 244, 0)");
-		// Line chart
-		new Chart(document.getElementById("chartjs-dashboard-line"), {
-			type: "line",
-			data: {
-				labels: ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"],
-				datasets: [{
-					label: "Sales ($)",
-					fill: true,
-					backgroundColor: gradient,
-					borderColor: window.theme.primary,
-					data: [
-						2115,
-						1562,
-						1584,
-						1892,
-						1587,
-						1923,
-						2566,
-						2448,
-						2805,
-						3438,
-						2917,
-						3327
-					]
-				}]
-			},
-			options: {
-				maintainAspectRatio: false,
-				legend: {
-					display: false
-				},
-				tooltips: {
-					intersect: false
-				},
-				hover: {
-					intersect: true
-				},
-				plugins: {
-					filler: {
-						propagate: false
-					}
-				},
-				scales: {
-					xAxes: [{
-						reverse: true,
-						gridLines: {
-							color: "rgba(0,0,0,0.0)"
-						}
-					}],
-					yAxes: [{
-						ticks: {
-							stepSize: 1000
-						},
-						display: true,
-						borderDash: [3, 3],
-						gridLines: {
-							color: "rgba(0,0,0,0.0)"
-						}
-					}]
-				}
-			}
-		});
-	});
+  document.addEventListener("DOMContentLoaded", function () {
+    feather.replace();
+
+    const datosDias = {
+      labels: [{% for dia in dias_top_rutas %}'{{ dia.fecha.strftime('%d %b') }}'{% if not loop.last %}, {% endif %}{% endfor %}],
+      datasets: [{
+        data: [{% for dia in dias_top_rutas %}{{ dia.total_rutas }}{% if not loop.last %}, {% endif %}{% endfor %}],
+        backgroundColor: [
+          '#4e73df', '#1cc88a', '#36b9cc', '#f6c23e', '#e74a3b'
+        ],
+        hoverBackgroundColor: [
+          '#2e59d9', '#17a673', '#2c9faf', '#dda20a', '#be2617'
+        ],
+        borderWidth: 1
+      }]
+    };
+
+    const configDias = {
+      type: 'doughnut',
+      data: datosDias,
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        cutout: 70,
+        plugins: {
+          legend: {
+            position: 'bottom',
+            labels: { padding: 20 }
+          },
+          tooltip: {
+            enabled: true
+          }
+        }
+      }
+    };
+
+    const ctxDias = document.getElementById('chart-rutas-dias').getContext('2d');
+    new Chart(ctxDias, configDias);
+  });
 </script>
-<script>
-	document.addEventListener("DOMContentLoaded", function() {
-		// Pie chart
-		new Chart(document.getElementById("chartjs-dashboard-pie"), {
-			type: "pie",
-			data: {
-				labels: ["Chrome", "Firefox", "IE"],
-				datasets: [{
-					data: [4306, 3801, 1689],
-					backgroundColor: [
-						window.theme.primary,
-						window.theme.warning,
-						window.theme.danger
-					],
-					borderWidth: 5
-				}]
-			},
-			options: {
-				responsive: !window.MSInputMethodContext,
-				maintainAspectRatio: false,
-				legend: {
-					display: false
-				},
-				cutoutPercentage: 75
-			}
-		});
-	});
-</script>
-<script>
-	document.addEventListener("DOMContentLoaded", function() {
-		// Bar chart
-		new Chart(document.getElementById("chartjs-dashboard-bar"), {
-			type: "bar",
-			data: {
-				labels: ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"],
-				datasets: [{
-					label: "This year",
-					backgroundColor: window.theme.primary,
-					borderColor: window.theme.primary,
-					hoverBackgroundColor: window.theme.primary,
-					hoverBorderColor: window.theme.primary,
-					data: [54, 67, 41, 55, 62, 45, 55, 73, 60, 76, 48, 79],
-					barPercentage: .75,
-					categoryPercentage: .5
-				}]
-			},
-			options: {
-				maintainAspectRatio: false,
-				legend: {
-					display: false
-				},
-				scales: {
-					yAxes: [{
-						gridLines: {
-							display: false
-						},
-						stacked: false,
-						ticks: {
-							stepSize: 20
-						}
-					}],
-					xAxes: [{
-						stacked: false,
-						gridLines: {
-							color: "transparent"
-						}
-					}]
-				}
-			}
-		});
-	});
-</script>
-<script>
-	document.addEventListener("DOMContentLoaded", function() {
-		var markers = [{
-				coords: [31.230391, 121.473701],
-				name: "Shanghai"
-			},
-			{
-				coords: [28.704060, 77.102493],
-				name: "Delhi"
-			},
-			{
-				coords: [6.524379, 3.379206],
-				name: "Lagos"
-			},
-			{
-				coords: [35.689487, 139.691711],
-				name: "Tokyo"
-			},
-			{
-				coords: [23.129110, 113.264381],
-				name: "Guangzhou"
-			},
-			{
-				coords: [40.7127837, -74.0059413],
-				name: "New York"
-			},
-			{
-				coords: [34.052235, -118.243683],
-				name: "Los Angeles"
-			},
-			{
-				coords: [41.878113, -87.629799],
-				name: "Chicago"
-			},
-			{
-				coords: [51.507351, -0.127758],
-				name: "London"
-			},
-			{
-				coords: [40.416775, -3.703790],
-				name: "Madrid "
-			}
-		];
-		var map = new jsVectorMap({
-			map: "world",
-			selector: "#world_map",
-			zoomButtons: true,
-			markers: markers,
-			markerStyle: {
-				initial: {
-					r: 9,
-					strokeWidth: 7,
-					stokeOpacity: .4,
-					fill: window.theme.primary
-				},
-				hover: {
-					fill: window.theme.primary,
-					stroke: window.theme.primary
-				}
-			},
-			zoomOnScroll: false
-		});
-		window.addEventListener("resize", () => {
-			map.updateSize();
-		});
-	});
-</script>
-<script>
-	document.addEventListener("DOMContentLoaded", function() {
-		var date = new Date(Date.now() - 5 * 24 * 60 * 60 * 1000);
-		var defaultDate = date.getUTCFullYear() + "-" + (date.getUTCMonth() + 1) + "-" + date.getUTCDate();
-		document.getElementById("datetimepicker-dashboard").flatpickr({
-			inline: true,
-			prevArrow: "<span title=\"Previous month\">&laquo;</span>",
-			nextArrow: "<span title=\"Next month\">&raquo;</span>",
-			defaultDate: defaultDate
-		});
-	});
-</script>
-<script src="{{ url_for('static', filename='js/app.js') }}"></script>
 {% endblock %}

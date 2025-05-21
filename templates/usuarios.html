@@ -129,8 +129,10 @@
                 <div class="card flex-fill mb-4">
                     <div class="card-header d-flex justify-content-between align-items-center">
                         <h5 class="card-title mb-0">Usuarios</h5>
+                        {% if mostrar_boton_añadir %}
                         <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#modalCrearUsuario">+
                             Añadir</button>
+                        {% endif %}
                     </div>
                     <div class="card-body">
                         <ul class="nav nav-tabs mb-3" id="usuario-tabs" role="tablist">
@@ -175,10 +177,15 @@
                                                     </label>
                                                 </td>
                                                 <td class="acciones text-center">
+                                                    {% if mostrar_icono_editar %}
                                                     <i class="material-icons text-primary" title="Editar"
                                                         onclick="editarUsuario('{{ u.id }}')">edit</i>
+                                                    {% endif %}
+                                                    {% if mostrar_icono_eliminar %}
                                                     <i class="material-icons text-danger" title="Eliminar"
                                                         onclick="eliminarUsuario('{{ u.id }}')">delete</i>
+                                                    {% endif %}
+
                                                 </td>
                                             </tr>
                                             {% endfor %}
@@ -216,14 +223,15 @@
                                                         <span class="slider"></span>
                                                     </label>
                                                 </td>
-
-
-
                                                 <td class="acciones text-center">
+                                                    {% if mostrar_icono_editar %}
                                                     <i class="material-icons text-primary" title="Editar"
                                                         onclick="editarUsuario('{{ u.id }}')">edit</i>
+                                                    {% endif %}
+                                                    {% if mostrar_icono_eliminar %}
                                                     <i class="material-icons text-danger" title="Eliminar"
                                                         onclick="eliminarUsuario('{{ u.id }}')">delete</i>
+                                                    {% endif %}
                                                 </td>
                                             </tr>
                                             {% endfor %}

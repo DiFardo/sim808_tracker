@@ -1,10 +1,10 @@
 from bd_conexion import obtener_conexion
 from werkzeug.security import generate_password_hash
-
+import psycopg2.extras
 def obtener_usuario(dni_usuario):
     conexion = obtener_conexion()
     usuario = None
-    with conexion.cursor() as cursor:
+    with conexion.cursor(cursor_factory=psycopg2.extras.DictCursor) as cursor:
         cursor.execute(
             """
             SELECT u.id AS usuario_id, 
@@ -14,7 +14,9 @@ def obtener_usuario(dni_usuario):
                    CONCAT(p.nombre, ' ', p.apellido) AS nombre_completo, 
                    r.nombre AS rol_nombre, 
                    COALESCE(p.imagen, '/static/img/default-profile.png') AS imagen,
-                   r.id AS rol_id
+                   r.id AS rol_id,
+                   p.id AS persona_id,
+                   p.superusuario  -- agregar aquí
             FROM usuarios u
             JOIN personas p ON u.id_persona = p.id
             LEFT JOIN roles r ON p.id_rol = r.id
@@ -23,6 +25,46 @@ def obtener_usuario(dni_usuario):
         usuario = cursor.fetchone()
     conexion.close()
     return usuario
+
+
+def obtener_todos_usuarios():
+    conexion = obtener_conexion()
+    with conexion.cursor(cursor_factory=psycopg2.extras.DictCursor) as cursor:
+        cursor.execute(
+            """
+            SELECT u.id AS usuario_id, 
+                   u.dni, 
+                   u.pass, 
+                   u.token, 
+                   CONCAT(p.nombre, ' ', p.apellido) AS nombre_completo, 
+                   r.nombre AS rol_nombre, 
+                   COALESCE(p.imagen, '/static/img/default-profile.png') AS imagen,
+                   r.id AS rol_id,
+                   p.id AS persona_id,
+                   p.superusuario
+            FROM usuarios u
+            JOIN personas p ON u.id_persona = p.id
+            LEFT JOIN roles r ON p.id_rol = r.id
+            WHERE p.estado = TRUE
+            ORDER BY p.nombre, p.apellido
+            """
+        )
+        usuarios = cursor.fetchall()
+    conexion.close()
+    return usuarios
+
+def obtener_roles_activos():
+    conexion = obtener_conexion()
+    with conexion.cursor(cursor_factory=psycopg2.extras.DictCursor) as cursor:
+        cursor.execute("""
+            SELECT id, nombre
+            FROM roles
+            WHERE estado = TRUE
+            ORDER BY nombre
+        """)
+        roles = cursor.fetchall()
+    conexion.close()
+    return roles
 
 
 

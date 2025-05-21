@@ -7,10 +7,21 @@ def registrar_ruta_y_asignacion(id_persona, id_vehiculo, destino_lat, destino_lo
             return False, "Faltan campos requeridos", None
 
         with conexion.cursor() as cursor:
+            # Validar si ya existe una ruta para ese conductor en esa fecha
+            cursor.execute("""
+                SELECT 1
+                FROM rutas_programadas rp
+                JOIN asignacion_ruta_conductor arc ON rp.id = arc.id_ruta
+                WHERE arc.id_persona = %s AND rp.fecha = %s;
+            """, (id_persona, fecha))
+            
+            if cursor.fetchone():
+                return False, "El conductor ya tiene una ruta asignada en esta fecha.", None
+
+            # Insertar nueva ruta
             cursor.execute("""
                 INSERT INTO rutas_programadas (
-                    destino, destino_lat, destino_lon,
-                    fecha
+                    destino, destino_lat, destino_lon, fecha
                 )
                 VALUES (%s, %s, %s, %s)
                 RETURNING id;
@@ -18,11 +29,13 @@ def registrar_ruta_y_asignacion(id_persona, id_vehiculo, destino_lat, destino_lo
             
             id_ruta = cursor.fetchone()[0]
 
+            # Asignar ruta a conductor y vehículo
             cursor.execute("""
                 INSERT INTO asignacion_ruta_conductor (id_persona, id_vehiculo, id_ruta)
                 VALUES (%s, %s, %s);
             """, (id_persona, id_vehiculo, id_ruta))
 
+            # Cambiar estado del vehículo
             cursor.execute("UPDATE vehiculos SET estado = FALSE WHERE id = %s;", (id_vehiculo,))
 
         conexion.commit()
@@ -169,6 +182,64 @@ def obtener_rutas_programadas():
         conexion.close()
 
     return rutas
+
+
+def obtener_rutas_con_estado_envio():
+    conexion = obtener_conexion()
+    rutas = []
+
+    try:
+        with conexion.cursor() as cursor:
+            cursor.execute("""
+                SELECT 
+                    rp.id,
+                    rp.origen,
+                    rp.origen_lat,
+                    rp.origen_lon,
+                    rp.destino,
+                    rp.destino_lat,
+                    rp.destino_lon,
+                    rp.fecha,
+                    rp.hora_salida,
+                    rp.hora_llegada,
+                    rp.estado_envio,  -- ✅ campo necesario
+                    arc.id_persona,
+                    arc.id_vehiculo,
+                    CONCAT(p.nombre, ' ', p.apellido) AS conductor,
+                    CONCAT(v.modelo, ' - ', v.placa) AS vehiculo
+                FROM rutas_programadas rp
+                JOIN asignacion_ruta_conductor arc ON rp.id = arc.id_ruta
+                JOIN personas p ON arc.id_persona = p.id
+                JOIN vehiculos v ON arc.id_vehiculo = v.id
+                ORDER BY rp.creado_en ASC;
+            """)
+
+            for row in cursor.fetchall():
+                rutas.append({
+                    "id": row[0],
+                    "origen": row[1],
+                    "origen_lat": row[2],
+                    "origen_lon": row[3],
+                    "destino": row[4],
+                    "destino_lat": row[5],
+                    "destino_lon": row[6],
+                    "fecha": row[7],
+                    "hora_salida": row[8],
+                    "hora_llegada": row[9],
+                    "estado_envio": row[10],           # ✅ nuevo
+                    "id_persona": row[11],
+                    "id_vehiculo": row[12],
+                    "conductor": row[13],
+                    "vehiculo": row[14],
+                    "duracion": calcular_duracion(row[8], row[9]) if row[9] else None
+                })
+    except Exception as e:
+        print("Error al obtener rutas con estado_envio:", e)
+    finally:
+        conexion.close()
+
+    return rutas
+
 
 
 

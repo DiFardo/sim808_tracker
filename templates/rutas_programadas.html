@@ -152,9 +152,12 @@
 
 
   .ruta-card {
-    transition: all 0.3s ease-in-out;
-    border-radius: 12px;
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
   }
+
 
   .ruta-card:hover {
     box-shadow: 0 6px 20px rgba(0, 0, 0, 0.15);
@@ -264,74 +267,76 @@
     {% endif %}
     {% set _ = rutas_por_conductor[conductor].append(ruta) %}
     {% endfor %}
-    {% for conductor, rutas_del_conductor in rutas_por_conductor.items() %}
-    <div class="mb-5">
-      <h5 class="mb-3"><i class="fas fa-user me-2 text-primary"></i><strong>{{ conductor }}</strong></h5>
 
-      <div class="row g-4">
-        {% for ruta in rutas_del_conductor %}
-        <div class="col-lg-4 col-md-6 col-sm-12">
-          <div class="card ruta-card shadow-sm p-3 mb-4 rounded">
-            <h5 class="card-title">
-              <i class="fas fa-route text-success me-2"></i>
-              Ruta:
-              {{ ruta.origen if ruta.origen else "Por confirmar vía GPS" }}
-              → {{ ruta.destino }}
-            </h5>
+    <div class="row g-4">
+      {% for conductor, rutas_del_conductor in rutas_por_conductor.items() %}
+      {% for ruta in rutas_del_conductor %}
+      <div class="col-lg-4 col-md-6 col-sm-12">
+        <div class="card ruta-card shadow-sm p-3 mb-4 rounded" data-id="{{ ruta.id }}"
+          data-conductor="{{ ruta.id_persona }}" data-vehiculo="{{ ruta.id_vehiculo }}" data-fecha="{{ ruta.fecha }}">
 
-            <p class="mb-2">
-              <i class="fas fa-calendar-alt text-primary me-2"></i>
-              <strong>Fecha:</strong> {{ ruta.fecha }}
-            </p>
+          <!-- Mostrar conductor dentro de cada tarjeta -->
+          <h5 class="mb-3 text-primary">
+            <i class="fas fa-user me-2"></i><strong>{{ ruta.conductor }}</strong>
+          </h5>
 
-            <p class="mb-2">
-              <i class="fas fa-car-side text-danger me-2"></i>
-              <strong>Vehículo:</strong> {{ ruta.vehiculo }}
-            </p>
+          <h5 class="card-title">
+            <i class="fas fa-route text-success me-2"></i>
+            Ruta: {{ ruta.origen if ruta.origen else "Por confirmar vía GPS" }} → {{ ruta.destino }}
+          </h5>
 
-            <p class="mb-2">
-              <i class="fas fa-sign-out-alt text-warning me-2"></i>
-              <strong>Salida:</strong>
-              {{ ruta.hora_salida.strftime('%H:%M') if ruta.hora_salida else "Aún no parte el vehículo" }}
-            </p>
+          <p class="mb-2">
+            <i class="fas fa-calendar-alt text-primary me-2"></i>
+            <strong>Fecha:</strong> {{ ruta.fecha }}
+          </p>
 
-            <p class="mb-2">
-              <i class="fas fa-sign-in-alt text-info me-2"></i>
-              <strong>Llegada:</strong>
-              {{ ruta.hora_llegada.strftime('%H:%M') if ruta.hora_llegada else "No registrada" }}
-            </p>
+          <p class="mb-2">
+            <i class="fas fa-car-side text-danger me-2"></i>
+            <strong>Vehículo:</strong> {{ ruta.vehiculo }}
+          </p>
 
-            <p class="mb-3">
-              <i class="fas fa-clock text-secondary me-2"></i>
-              <strong>Duración:</strong>
-              {{ ruta.duracion if ruta.duracion else "No disponible" }}
-            </p>
+          <p class="mb-2">
+            <i class="fas fa-sign-out-alt text-warning me-2"></i>
+            <strong>Salida:</strong>
+            {{ ruta.hora_salida.strftime('%H:%M') if ruta.hora_salida else "Aún no parte el vehículo" }}
+          </p>
 
-            <div class="d-flex justify-content-end gap-2">
-              {% if not ruta.hora_salida %}
-              <button class="btn btn-success btn-sm btnEditarRuta" data-id="{{ ruta.id }}"
-                data-conductor="{{ ruta.id_persona }}" data-vehiculo="{{ ruta.id_vehiculo }}"
-                data-destino="{{ ruta.destino }}" data-lat="{{ ruta.destino_lat }}" data-lon="{{ ruta.destino_lon }}"
-                data-fecha="{{ ruta.fecha }}">
-                <i class="fas fa-pen"></i>
-              </button>
-              <button class="btn btn-danger btn-sm" id="btnEliminarRuta" data-id="{{ ruta.id }}">
-                <i class="fas fa-trash-alt"></i>
-              </button>
-              {% else %}
-              <button class="btn btn-secondary btn-sm" disabled title="La ruta ya fue iniciada">
-                <i class="fas fa-lock"></i>
-              </button>
-              {% endif %}
-            </div>
+          <p class="mb-2">
+            <i class="fas fa-sign-in-alt text-info me-2"></i>
+            <strong>Llegada:</strong>
+            {{ ruta.hora_llegada.strftime('%H:%M') if ruta.hora_llegada else "No registrada" }}
+          </p>
 
+          <p class="mb-3">
+            <i class="fas fa-clock text-secondary me-2"></i>
+            <strong>Duración:</strong>
+            {{ ruta.duracion if ruta.duracion else "No disponible" }}
+          </p>
+
+          <div class="d-flex justify-content-end gap-2">
+            {% if not ruta.hora_salida %}
+            <button class="btn btn-success btn-sm btnEditarRuta" data-id="{{ ruta.id }}"
+              data-conductor="{{ ruta.id_persona }}" data-vehiculo="{{ ruta.id_vehiculo }}"
+              data-destino="{{ ruta.destino }}" data-lat="{{ ruta.destino_lat }}" data-lon="{{ ruta.destino_lon }}"
+              data-fecha="{{ ruta.fecha }}">
+              <i class="fas fa-pen"></i>
+            </button>
+            <button class="btn btn-danger btn-sm" id="btnEliminarRuta" data-id="{{ ruta.id }}">
+              <i class="fas fa-trash-alt"></i>
+            </button>
+            {% else %}
+            <button class="btn btn-secondary btn-sm" disabled title="La ruta ya fue iniciada">
+              <i class="fas fa-lock"></i>
+            </button>
+            {% endif %}
           </div>
-        </div>
 
-        {% endfor %}
+        </div>
       </div>
+      {% endfor %}
+      {% endfor %}
     </div>
-    {% endfor %}
+
 
 
 
@@ -571,7 +576,7 @@
         opt.selected = opt.value === idConductor;
       }
 
-      // Setear vehículo, incluso si está ocupado
+      // Setear vehículo
       const vehiculoSelect = document.getElementById("vehiculo");
       const idVehiculo = this.dataset.vehiculo;
       if (!Array.from(vehiculoSelect.options).some(opt => opt.value === idVehiculo)) {
@@ -610,7 +615,7 @@
     });
   });
 
-  // Enviar formulario (crear o editar)
+  // Validación y envío del formulario
   document.getElementById("formAsignarRuta").addEventListener("submit", async function (e) {
     e.preventDefault();
 
@@ -625,6 +630,38 @@
       return;
     }
 
+    // Validar si conductor o vehículo ya tienen ruta ese día
+    const rutas = document.querySelectorAll(".ruta-card");
+    let conflictoConductor = false;
+    let conflictoVehiculo = false;
+
+    rutas.forEach(ruta => {
+      const rutaFecha = ruta.getAttribute("data-fecha");
+      const rutaConductor = ruta.getAttribute("data-conductor");
+      const rutaVehiculo = ruta.getAttribute("data-vehiculo");
+
+      // Evitar validar contra sí mismo si está editando
+      if (!rutaEnEdicion || ruta.dataset.id !== rutaEnEdicion) {
+        if (rutaFecha === fecha && rutaConductor === conductor) {
+          conflictoConductor = true;
+        }
+        if (rutaFecha === fecha && rutaVehiculo === vehiculo) {
+          conflictoVehiculo = true;
+        }
+      }
+    });
+
+    if (conflictoConductor) {
+      alertify.error("🚫 Este conductor ya tiene una ruta asignada para esta fecha.");
+      return;
+    }
+
+    if (conflictoVehiculo) {
+      alertify.error("🚫 Este vehículo ya tiene una ruta asignada para esta fecha.");
+      return;
+    }
+
+    // Enviar formulario
     const formData = new FormData(this);
     const url = rutaEnEdicion ? `/api/ruta/${rutaEnEdicion}` : `/api/asignar_ruta`;
     const method = rutaEnEdicion ? "PUT" : "POST";
@@ -654,7 +691,7 @@
     document.getElementById("formAsignarRuta").reset();
     document.getElementById("destino_coords").value = "";
 
-    // Restaurar fecha mínima por si es nuevo
+    // Restaurar fecha mínima
     const hoy = new Date();
     const yyyy = hoy.getFullYear();
     const mm = String(hoy.getMonth() + 1).padStart(2, '0');
@@ -664,14 +701,14 @@
     fechaInput.min = hoyStr;
     fechaInput.value = hoyStr;
 
-    // Título y botón
+    // Restaurar estado visual
     document.querySelector("#modalRuta .modal-title").textContent = "Asignar Nueva Ruta";
     const boton = document.querySelector("#formAsignarRuta button[type='submit']");
     boton.innerHTML = `<i class="fas fa-save me-2"></i>Guardar Ruta`;
     boton.classList.remove("btn-primary");
     boton.classList.add("btn-success");
 
-    // Eliminar vehículo temporal si lo había
+    // Limpiar vehículo temporal si existe
     const vehiculoSelect = document.getElementById("vehiculo");
     Array.from(vehiculoSelect.options).forEach(opt => {
       if (opt.text.includes("ocupado") && opt.disabled) {
@@ -680,6 +717,7 @@
     });
   });
 </script>
+
 
 
 
