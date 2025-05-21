@@ -23,6 +23,12 @@ from pytz import timezone, utc
 from controladores.controlador_vehiculo import agregar_vehiculo, obtener_vehiculos
 from werkzeug.security import check_password_hash
 
+import logging
+
+
+
+
+
 
 app = Flask(__name__, static_url_path='/static', static_folder='static')
 from flask_jwt_extended import JWTManager
@@ -33,6 +39,16 @@ app.config['JWT_ACCESS_COOKIE_NAME'] = 'access_token_cookie'
 app.config['JWT_ACCESS_TOKEN_EXPIRES'] = timedelta(hours=2)
 app.config['JWT_COOKIE_CSRF_PROTECT'] = False  # Pon True si usarás CSRF con cookies
 app.url_map.strict_slashes = False
+
+
+logging.basicConfig(level=logging.DEBUG)
+
+@app.before_request
+def log_request_info():
+    app.logger.debug(f"Request path: {request.path}")
+    app.logger.debug(f"Method: {request.method}")
+    app.logger.debug(f"Headers: {request.headers}")
+    app.logger.debug(f"Body: {request.get_data()}")
 
 
 def tiene_permiso(permisos, id_modulo=None, id_opcion=None, id_accion=None):
