@@ -708,6 +708,8 @@ def registrar_origen_gps():
         return jsonify({"success": False, "message": str(e)}), 500
     finally:
         conexion.close()
+        
+
 
 @app.route("/api/registrar_ubicacion_gps", methods=["POST"])
 def registrar_ubicacion_gps():
@@ -844,4 +846,4 @@ def obtener_ultima_ubicacion():
 
 
 if __name__ == "__main__":
-          app.run(host="0.0.0.0", port=8000, debug=True)
+          app.run(host="0.0.0.0", port=5000, debug=True)

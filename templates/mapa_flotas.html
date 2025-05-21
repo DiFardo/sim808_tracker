@@ -470,21 +470,6 @@
     });
   }
 
-  // 🔄 Auto actualización cada 10 segundos
-  setInterval(() => {
-    fetch("/api/rutas_hoy", {
-      headers: {
-        "Authorization": "Bearer " + localStorage.getItem("access_token")
-      }
-    })
-      .then(res => res.json())
-      .then(data => {
-        if (data.success) {
-          actualizarContenidoRutas(data.rutas);
-        }
-      })
-      .catch(err => console.error("Error actualizando tarjetas:", err));
-  }, 10000);
 </script>
 
 
