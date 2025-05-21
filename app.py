@@ -433,24 +433,8 @@ def rutas_programadas():
                            conductores=conductores,
                            vehiculos=vehiculos)
 
-@app.route("/api/rutas_hoy")
-@jwt_required()
-def api_rutas_hoy():
-    rutas = controlador_rutas.obtener_rutas_con_estado_envio()
-    hoy = date.today()
 
-    def to_date(fecha_raw):
-        if isinstance(fecha_raw, date):
-            return fecha_raw
-        try:
-            return datetime.strptime(fecha_raw, "%Y-%m-%d").date()
-        except:
-            return None
 
-    rutas_hoy = [r for r in rutas if to_date(r["fecha"]) == hoy]
-
-    # Devuelve solo datos relevantes
-    return jsonify({"success": True, "rutas": rutas_hoy})
 
 @app.route("/api/ubicacion_actual")
 def ubicacion_actual():
@@ -739,7 +723,6 @@ def registrar_ubicacion_gps():
         if not hora_str or len(hora_str) < 14:
             return jsonify({"success": False, "message": "Formato de hora inválido"}), 400
 
-        # Convierte hora del SIM (formato 'YYYYMMDDHHMMSS') a hora Lima
         hora_sim = datetime.strptime(hora_str[:14], "%Y%m%d%H%M%S")
         hora_utc = utc.localize(hora_sim)
         hora_lima = hora_utc.astimezone(timezone("America/Lima"))
@@ -757,36 +740,34 @@ def registrar_ubicacion_gps():
     except Exception as e:
         print("❌ Error al registrar ubicación:", e)
         return jsonify({"success": False, "message": str(e)}), 500
-    
-@app.route("/api/ultima_ubicacion")
-def api_ultima_ubicacion():
-    id_ruta = request.args.get("id_ruta")
 
-    conexion = obtener_conexion()
+
+@app.route("/api/obtener_origen_ruta/<int:id_ruta>", methods=["GET"])
+def obtener_origen_ruta(id_ruta):
     try:
+        conexion = obtener_conexion()
         with conexion.cursor() as cursor:
             cursor.execute("""
                 SELECT lat, lon, hora
                 FROM ubicaciones_ruta
                 WHERE id_ruta = %s
-                ORDER BY hora DESC
+                ORDER BY hora ASC
                 LIMIT 1;
             """, (id_ruta,))
-            resultado = cursor.fetchone()
-            if resultado:
-                lat, lon, hora = resultado
-                return jsonify({
-                    "success": True,
-                    "lat": float(lat),
-                    "lon": float(lon),
-                    "hora": hora.isoformat()
-                }), 200
-            else:
-                return jsonify({"success": False, "message": "Sin ubicación"}), 404
+            fila = cursor.fetchone()
+            if not fila:
+                return jsonify({"success": False, "message": "No se encontró origen para esta ruta"}), 404
+            
+            lat, lon, hora = fila
+            hora_str = hora.strftime("%Y%m%d%H%M%S")
+
+        return jsonify({"success": True, "lat": lat, "lon": lon, "hora": hora_str}), 200
+
     except Exception as e:
+        print("❌ Error al obtener origen:", e)
         return jsonify({"success": False, "message": str(e)}), 500
-    finally:
-        conexion.close()
+    
+    
 
 @app.route("/api/finalizar_ruta", methods=["POST"])
 def finalizar_ruta():
