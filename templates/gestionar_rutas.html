@@ -1,0 +1,709 @@
+<!-- VISTA HTML COMPLETA CON PESTAÑAS -->
+{% extends "pagina_maestra.html" %}
+
+{% block titulo %}Gestión de Rutas{% endblock %}
+
+{% block link %}
+<link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css" rel="stylesheet">
+<link href="{{ url_for('static', filename='css/custom.css') }}" rel="stylesheet">
+<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+<link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
+<link rel="stylesheet" href="{{ url_for('static', filename='css/app.css') }}">
+<link rel="stylesheet" href="//cdn.jsdelivr.net/npm/alertifyjs@1.13.1/build/css/alertify.min.css" />
+<link rel="stylesheet" href="//cdn.jsdelivr.net/npm/alertifyjs@1.13.1/build/css/themes/default.min.css" />
+<style>
+    .form-section {
+        background-color: #ffffff;
+        border-right: 1px solid #dee2e6;
+        padding: 20px;
+        border-radius: 8px;
+        box-shadow: 0 2px 6px rgba(0, 0, 0, 0.05);
+    }
+
+    .table-section {
+        background-color: #ffffff;
+        padding: 20px;
+        border-radius: 8px;
+        box-shadow: 0 2px 6px rgba(0, 0, 0, 0.05);
+    }
+
+    .table thead {
+        background-color: #007bff;
+        color: white;
+    }
+
+    .nav-tabs .nav-link.active {
+        background-color: #ffffff !important;
+        border-color: #dee2e6 #dee2e6 #ffffff;
+        color: #007bff;
+        font-weight: 600;
+    }
+
+    .nav-tabs .nav-link {
+        color: #495057;
+        border: 1px solid transparent;
+    }
+
+    .nav-tabs {
+        border-bottom: 1px solid #dee2e6;
+    }
+</style>
+<style>
+    .tabla-rutas {
+        border-radius: 10px;
+        overflow: hidden;
+        box-shadow: 0 0 8px rgba(0, 0, 0, 0.1);
+        font-size: 14px;
+    }
+
+    .tabla-rutas th,
+    .tabla-rutas td {
+        vertical-align: middle;
+        text-align: center;
+    }
+
+    .tabla-rutas tbody tr:hover {
+        background-color: #f5f5f5;
+    }
+
+    .tabla-rutas .col-destino {
+        width: 50%;
+        text-align: left;
+        padding-left: 15px;
+    }
+
+    .tabla-rutas .col-fecha {
+        width: 20%;
+    }
+
+    .tabla-rutas .col-vehiculo {
+        width: 30%;
+    }
+</style>
+{% endblock %}
+
+{% block contenido %}
+<div id="content">
+    <div class="main-content">
+        <div class="container py-4">
+            <h2 class="mb-4">Gestión de Rutas</h2>
+
+            <!-- NAV DE PESTAÑAS -->
+            <ul class="nav nav-tabs mb-3" id="tabRutas" role="tablist">
+                <li class="nav-item" role="presentation">
+                    <button class="nav-link active" id="tab-programar" data-bs-toggle="tab"
+                        data-bs-target="#programarRuta" type="button" role="tab">Ruta Programada</button>
+                </li>
+                <li class="nav-item" role="presentation">
+                    <button class="nav-link" id="tab-asignar" data-bs-toggle="tab" data-bs-target="#asignarConductor"
+                        type="button" role="tab">Asignar Conductor</button>
+                </li>
+            </ul>
+
+            <div class="tab-content" id="tabRutasContent">
+
+                <!-- PESTAÑA RUTA PROGRAMADA -->
+                <div class="tab-pane fade show active" id="programarRuta" role="tabpanel">
+                    <div class="row g-3">
+                        <div class="col-lg-6 form-section">
+                            <form id="formRutaNueva">
+                                <div class="mb-3">
+                                    <label for="vehiculo">Vehículo</label>
+                                    <select id="vehiculo" name="vehiculo" class="form-select" required>
+                                        <option value="">Seleccione</option>
+                                        {% for vehiculo in vehiculos %}
+                                        <option value="{{ vehiculo.id }}" data-estado="{{ vehiculo.estado }}" {% if not
+                                            vehiculo.estado %}disabled{% endif %}>
+                                            {{ vehiculo.modelo }} - {{ vehiculo.placa }}{% if not vehiculo.estado %}
+                                            (Ocupado){% endif %}
+                                        </option>
+                                        {% endfor %}
+                                    </select>
+                                </div>
+                                <div class="mb-3">
+                                    <label for="fecha">Fecha</label>
+                                    <input type="date" class="form-control" id="fecha" name="fecha" required>
+                                </div>
+                                <input type="hidden" id="ruta_id" name="ruta_id">
+                                <div class="mb-3">
+                                    <label for="destino_input">Destino</label>
+                                    <input type="text" id="destino_input" name="destino" class="form-control"
+                                        placeholder="Buscar dirección de destino" required>
+                                    <input type="hidden" name="destino_coords" id="destino_coords">
+                                    <div id="mapa_destino" class="mt-2" style="height: 250px; border: 1px solid #ccc;">
+                                    </div>
+                                </div>
+                                <div class="alert alert-secondary text-center small">
+                                    📡 <strong>Nota:</strong> El punto de <strong>origen</strong> será capturado
+                                    automáticamente desde el GPS del vehículo.
+                                </div>
+                                <button type="submit" id="btnSubmitRuta" class="btn btn-success">
+                                    <i id="iconoBtnRuta" class="fas fa-save me-2"></i>
+                                    <span id="textoBtnRuta">Guardar Ruta</span>
+                                </button>
+
+                            </form>
+                        </div>
+
+                        <div class="col-lg-6 table-section">
+                            <h5 class="mb-3">Rutas Programadas</h5>
+                            <!-- tabla con estilos -->
+                            <table id="tablaRutas" class="table table-bordered table-hover tabla-rutas">
+
+                                <thead class="table-light">
+                                    <tr>
+                                        <th class="col-destino">Ruta (Destino)</th>
+                                        <th class="col-fecha">Fecha</th>
+                                        <th class="col-vehiculo">Vehículo</th>
+                                        <th class="text-center">Acciones</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for ruta in rutas_programadas %}
+                                    <tr data-id="{{ ruta.id }}">
+                                        <td class="col-destino">
+                                            {{ ruta.destino.split(',')[0] }}
+                                        </td>
+                                        <td class="col-fecha">{{ ruta.fecha }}</td>
+                                        <td class="col-vehiculo">{{ ruta.vehiculo }}</td>
+                                        <td class="text-center">
+                                            <div class="d-flex justify-content-center gap-2">
+                                                <button class="btn btn-success btn-sm btnEditarRuta"
+                                                    data-id="{{ ruta.id }}" data-conductor="{{ ruta.id_persona }}"
+                                                    data-vehiculo="{{ ruta.id_vehiculo }}"
+                                                    data-destino="{{ ruta.destino }}" data-lat="{{ ruta.destino_lat }}"
+                                                    data-lon="{{ ruta.destino_lon }}" data-fecha="{{ ruta.fecha }}">
+                                                    <i class="fas fa-pen"></i>
+                                                </button>
+                                                <button class="btn btn-danger btn-sm btnEliminarRuta"
+                                                    data-id="{{ ruta.id }}" data-vehiculo="{{ ruta.id_vehiculo }}">
+                                                    <i class="fas fa-trash-alt"></i>
+                                                </button>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                    {% endfor %}
+                                </tbody>
+
+
+                            </table>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- PESTAÑA ASIGNAR CONDUCTOR -->
+                <div class="tab-pane fade" id="asignarConductor" role="tabpanel">
+                    <div class="row g-3">
+                        <div class="col-lg-6 form-section">
+                            <form id="formAsignarConductor">
+                                <div class="mb-3">
+                                    <label for="ruta_sin_conductor">Ruta Sin Conductor</label>
+                                    <select id="ruta_sin_conductor" name="ruta_id" class="form-select" required>
+                                        <option value="">Seleccione</option>
+                                        {% for ruta in rutas_sin_conductor %}
+                                        <option value="{{ ruta.id }}">{{ ruta.destino }} - {{ ruta.fecha }}</option>
+                                        {% endfor %}
+                                    </select>
+                                </div>
+                                <div class="mb-3">
+                                    <label for="conductor">Conductor</label>
+                                    <select id="conductor" name="conductor_id" class="form-select" required>
+                                        <option value="">Seleccione</option>
+                                        {% for conductor in conductores %}
+                                        <option value="{{ conductor.id }}">{{ conductor.nombre }} {{ conductor.apellido
+                                            }}</option>
+                                        {% endfor %}
+                                    </select>
+                                </div>
+                                <input type="hidden" id="ruta_id" name="ruta_id">
+                                <div class="d-grid">
+                                    <button type="submit" class="btn btn-primary">
+                                        <i class="fas fa-user-check me-2"></i>Asignar Conductor
+                                    </button>
+                                </div>
+                            </form>
+                        </div>
+
+                        <div class="col-lg-6 table-section">
+                            <h5 class="mb-3">Conductores Asignados</h5>
+                            <table class="table table-bordered table-hover">
+                                <thead>
+                                    <tr>
+                                        <th>Conductor</th>
+                                        <th>Destino</th>
+                                        <th class="text-center">Acciones</th>
+
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for asignacion in asignaciones %}
+                                    <tr data-id="{{ asignacion.id}}">
+                                        <td>{{ asignacion.conductor }}</td>
+                                        <td>{{ asignacion.destino }}</td>
+                                        <td class="text-center">
+                                            <div class="d-flex justify-content-center gap-2">
+                                                <button class="btn btn-success btn-sm btnEditarRuta"
+                                                    data-id="{{ asignacion.id }}"
+                                                    data-conductor="{{ asignacion.id_persona }}"
+                                                    data-vehiculo="{{ asignacion.id_vehiculo }}"
+                                                    data-destino="{{ asignacion.destino }}"
+                                                    data-lat="{{ asignacion.destino_lat }}"
+                                                    data-lon="{{ asignacion.destino_lon }}"
+                                                    data-fecha="{{ asignacion.fecha }}">
+                                                    <i class="fas fa-pen"></i>
+                                                </button>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                    {% endfor %}
+                                </tbody>
+
+                            </table>
+                        </div>
+                    </div>
+                </div>
+
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    let mapaDestino, marcadorDestino, geocoder;
+
+    function initMap() {
+        const chiclayo = { lat: -6.7714, lng: -79.8409 };
+        geocoder = new google.maps.Geocoder();
+
+        mapaDestino = new google.maps.Map(document.getElementById("mapa_destino"), {
+            center: chiclayo,
+            zoom: 14
+        });
+
+        marcadorDestino = new google.maps.Marker({
+            map: mapaDestino,
+            label: "D",
+            draggable: true
+        });
+
+        const inputDestino = document.getElementById("destino_input");
+        const inputCoords = document.getElementById("destino_coords");
+
+        const autocomplete = new google.maps.places.Autocomplete(inputDestino, {
+            fields: ["geometry", "formatted_address"],
+            componentRestrictions: { country: "pe" }
+        });
+
+        autocomplete.addListener("place_changed", function () {
+            const place = autocomplete.getPlace();
+            if (!place.geometry) return;
+
+            const location = place.geometry.location;
+            mapaDestino.setCenter(location);
+            marcadorDestino.setPosition(location);
+
+            inputCoords.value = `${location.lat()},${location.lng()}`;
+        });
+
+        mapaDestino.addListener("click", function (e) {
+            marcadorDestino.setPosition(e.latLng);
+            inputCoords.value = `${e.latLng.lat()},${e.latLng.lng()}`;
+            reverseGeocode(e.latLng, inputDestino);
+        });
+    }
+
+    function reverseGeocode(latlng, input) {
+        geocoder.geocode({ location: latlng }, function (results, status) {
+            if (status === "OK" && results[0]) {
+                input.value = results[0].formatted_address;
+            }
+        });
+    }
+</script>
+
+
+<script>
+    // ========== FUNCIONES AUXILIARES ==========
+    function getFechaLimaHoy() {
+        const limaOffset = -5 * 60;
+        const ahoraUTC = new Date();
+        const ahoraLima = new Date(ahoraUTC.getTime() + limaOffset * 60000 - ahoraUTC.getTimezoneOffset() * 60000);
+        return ahoraLima.toISOString().split("T")[0];
+    }
+
+    function crearElementoDesdeHTML(html) {
+        const temp = document.createElement("table");
+        temp.innerHTML = html.trim();
+        return temp.querySelector("tr");
+    }
+    // ========== FUNCIONES AUXILIARES ==========
+
+    function getFechaLimaHoy() {
+        const ahora = new Date();
+
+        const año = ahora.getFullYear();
+        const mes = String(ahora.getMonth() + 1).padStart(2, '0');
+        const dia = String(ahora.getDate()).padStart(2, '0');
+
+        return `${año}-${mes}-${dia}`;
+    }
+
+
+    function crearElementoDesdeHTML(html) {
+        const temp = document.createElement("table");
+        temp.innerHTML = html.trim();
+        return temp.querySelector("tr");
+    }
+
+    // ========== SCRIPT PRINCIPAL ==========
+
+    document.addEventListener("DOMContentLoaded", function () {
+        let botonEdicionActiva = null;
+
+        const formRuta = document.getElementById("formRutaNueva");
+        const formAsignar = document.getElementById("formAsignarConductor");
+
+        const fechaInput = document.getElementById("fecha");
+        const hoy = getFechaLimaHoy();
+        fechaInput.value = hoy;
+        fechaInput.min = hoy;
+
+        function activarEdicion(btn, tipo) {
+            if (botonEdicionActiva && botonEdicionActiva !== btn) cancelarEdicion();
+
+            const icono = btn.querySelector("i");
+            icono.classList.remove("fa-pen");
+            icono.classList.add("fa-times");
+            btn.classList.add("cancelando");
+
+            if (tipo === "ruta") {
+                document.getElementById("vehiculo").value = btn.dataset.vehiculo;
+                document.getElementById("fecha").value = btn.dataset.fecha;
+                document.getElementById("destino_input").value = btn.dataset.destino;
+                document.getElementById("destino_coords").value = `${btn.dataset.lat},${btn.dataset.lon}`;
+
+
+                document.getElementById("ruta_id").value = btn.dataset.id;
+
+                const nuevaPos = new google.maps.LatLng(parseFloat(btn.dataset.lat), parseFloat(btn.dataset.lon));
+                marcadorDestino.setPosition(nuevaPos);
+                mapaDestino.setCenter(nuevaPos);
+
+                document.getElementById("textoBtnRuta").textContent = "Actualizar Ruta";
+                document.querySelector('#tab-programar').click();
+            } else if (tipo === "conductor") {
+                const rutaId = btn.dataset.id;
+                const conductorId = btn.dataset.conductor;
+                const destino = btn.dataset.destino?.split(",")[0] || "Destino desconocido";
+                const fecha = btn.dataset.fecha || "Sin fecha";
+
+                const comboRuta = document.getElementById("ruta_sin_conductor");
+
+                let opcionRuta = comboRuta.querySelector(`option[value='${rutaId}']`);
+                if (!opcionRuta) {
+                    opcionRuta = document.createElement("option");
+                    opcionRuta.value = rutaId;
+                    opcionRuta.textContent = `${destino} - ${fecha}`;
+                    comboRuta.appendChild(opcionRuta);
+                }
+
+                comboRuta.value = rutaId;
+                document.getElementById("conductor").value = conductorId;
+                document.getElementById("ruta_id").value = rutaId;
+
+                document.querySelector('#tab-asignar').click();
+            }
+
+
+
+
+            window.scrollTo({ top: 0, behavior: "smooth" });
+            botonEdicionActiva = btn;
+        }
+
+        function cancelarEdicion() {
+            if (botonEdicionActiva) {
+                const icono = botonEdicionActiva.querySelector("i");
+                icono.classList.remove("fa-times");
+                icono.classList.add("fa-pen");
+                botonEdicionActiva.classList.remove("cancelando");
+            }
+
+            formRuta.reset();
+            formAsignar.reset();
+            document.getElementById("ruta_id").value = "";
+            document.getElementById("destino_coords").value = "";
+            fechaInput.value = getFechaLimaHoy();
+            document.getElementById("textoBtnRuta").textContent = "Guardar Ruta";
+            botonEdicionActiva = null;
+        }
+
+        function asignarEventosEditar() {
+            document.querySelectorAll(".btnEditarRuta").forEach(btn => {
+                btn.addEventListener("click", function () {
+                    const tipo = this.closest("#asignarConductor") ? "conductor" : "ruta";
+                    this.classList.contains("cancelando") ? cancelarEdicion() : activarEdicion(this, tipo);
+                });
+            });
+        }
+
+        function actualizarEstadoVehiculo(idVehiculo, ocupado) {
+            const option = document.querySelector(`#vehiculo option[value='${idVehiculo}']`);
+            if (!option) return;
+
+            option.disabled = ocupado;
+            const textoOriginal = option.textContent.replace(" (Ocupado)", "");
+            option.textContent = ocupado ? `${textoOriginal} (Ocupado)` : textoOriginal;
+        }
+        function actualizarOpcionesConductorVisual() {
+            const combo = document.getElementById("conductor");
+            const conductoresAsignados = new Set();
+            document.querySelectorAll("#asignarConductor table tbody tr").forEach(fila => {
+                const idConductor = fila.querySelector("button.btnEditarRuta")?.dataset.conductor;
+                if (idConductor) conductoresAsignados.add(idConductor);
+            });
+            combo.querySelectorAll("option").forEach(opt => {
+                const id = opt.value;
+                const nombreOriginal = opt.textContent.replace(" (Asignado)", "");
+
+                if (conductoresAsignados.has(id)) {
+                    opt.textContent = `${nombreOriginal} (Asignado)`;
+                    opt.disabled = true;
+                } else {
+                    opt.textContent = nombreOriginal;
+                    opt.disabled = false;
+                }
+            });
+        }
+
+
+        asignarEventosEditar();
+        asignarEventosEliminar();
+        actualizarOpcionesConductorVisual();
+
+
+        formRuta.addEventListener("submit", async function (e) {
+            e.preventDefault();
+
+            const rutaId = document.getElementById("ruta_id").value.trim();
+            const formData = new FormData(this);
+            const url = rutaId ? "/api/editar_ruta" : "/api/asignar_ruta";
+            const method = rutaId ? "PUT" : "POST";
+
+            try {
+                const response = await fetch(url, { method, body: formData });
+                const result = await response.json();
+
+                if (result.success) {
+                    alertify.success("✅ " + result.message);
+                    const r = result.ruta;
+
+                    // 🔄 Actualizar estado de vehículos
+                    if (rutaId) {
+                        const idVehiculoAnterior = botonEdicionActiva?.dataset.vehiculo;
+                        if (idVehiculoAnterior && idVehiculoAnterior !== r.vehiculo_id) {
+                            actualizarEstadoVehiculo(idVehiculoAnterior, false); // desocupa anterior
+                        }
+                    }
+                    actualizarEstadoVehiculo(r.vehiculo_id, true); // ocupa nuevo
+
+                    const nuevaFila = `
+                        <tr data-id="${r.id}">
+                            <td class="col-destino">${r.destino.split(',')[0]}</td>
+                            <td class="col-fecha">${r.fecha}</td>
+                            <td class="col-vehiculo">${r.vehiculo}</td>
+                            <td class="text-center">
+                                <div class="d-flex justify-content-center gap-2">
+                                    <button class="btn btn-success btn-sm btnEditarRuta"
+                                        data-id="${r.id}"
+                                        data-conductor=""
+                                        data-vehiculo="${r.vehiculo_id}"
+                                        data-destino="${r.destino}"
+                                        data-lat="${r.lat}"
+                                        data-lon="${r.lon}"
+                                        data-fecha="${r.fecha}">
+                                        <i class="fas fa-pen"></i>
+                                    </button>
+                                    <button class="btn btn-danger btn-sm btnEliminarRuta"
+                                        data-id="${r.id}">
+                                        <i class="fas fa-trash-alt"></i>
+                                    </button>
+                                </div>
+                            </td>
+                        </tr>
+                    `;
+
+                    const tbody = document.querySelector("#tablaRutas tbody");
+                    const fila = tbody.querySelector(`tr[data-id="${r.id}"]`);
+                    const nuevaFilaElemento = crearElementoDesdeHTML(nuevaFila);
+                    if (fila) {
+                        fila.replaceWith(nuevaFilaElemento);
+                    } else {
+                        tbody.insertAdjacentElement("afterbegin", nuevaFilaElemento);
+                    }
+
+                    const comboRutasSinConductor = document.getElementById("ruta_sin_conductor");
+                    let opcionExistente = comboRutasSinConductor.querySelector(`option[value="${r.id}"]`);
+                    const nuevoTexto = `${r.destino.split(',')[0]} - ${r.fecha}`;
+
+                    if (opcionExistente) {
+                        // 🔄 Actualiza texto si ya existe
+                        opcionExistente.textContent = nuevoTexto;
+                    } else {
+                        // ➕ Agrega nueva opción si no existe
+                        const nuevaOpcion = document.createElement("option");
+                        nuevaOpcion.value = r.id;
+                        nuevaOpcion.textContent = nuevoTexto;
+                        comboRutasSinConductor.appendChild(nuevaOpcion);
+                    }
+
+
+                    asignarEventosEditar();
+                    cancelarEdicion();
+                    asignarEventosEliminar();
+                    actualizarOpcionesConductorVisual();
+
+
+
+                } else {
+                    alertify.error("❌ " + result.message);
+                }
+            } catch (err) {
+                console.error(err);
+                alertify.error("❌ Error de conexión al servidor.");
+            }
+        });
+
+        formAsignar.addEventListener("submit", async function (e) {
+            e.preventDefault();
+
+            const rutaId = document.getElementById("ruta_id").value.trim();
+            const conductorID = document.getElementById("conductor").value;
+            const rutaSelect = document.getElementById("ruta_sin_conductor");
+            const conductorText = document.getElementById("conductor").selectedOptions[0]?.text;
+
+            if (!rutaSelect.value || !conductorID) {
+                alertify.error("⚠️ Debes seleccionar una ruta y un conductor.");
+                return;
+            }
+
+            const formData = new FormData(this);
+            const url = rutaId ? "/api/editar_conductor" : "/api/asignar_conductor";
+            const method = rutaId ? "PUT" : "POST";
+
+            try {
+                const response = await fetch(url, { method, body: formData });
+                const result = await response.json();
+
+                if (result.success) {
+                    alertify.success("✅ " + result.message);
+
+                    const tablaAsignados = document.querySelector("#asignarConductor table tbody");
+                    const fila = tablaAsignados.querySelector(`tr[data-id='${rutaId}']`);
+
+                    const nuevaFila = `
+                        <tr data-id="${rutaId}">
+                            <td>${conductorText}</td>
+                            <td>${rutaSelect.selectedOptions[0].text.split(" - ")[0]}</td>
+                            <td class="text-center">
+                                <div class="d-flex justify-content-center gap-2">
+                                    <button class="btn btn-success btn-sm btnEditarRuta"
+                                        data-id="${rutaId}"
+                                        data-conductor="${conductorID}"
+                                        data-vehiculo=""
+                                        data-destino=""
+                                        data-lat=""
+                                        data-lon=""
+                                        data-fecha="">
+                                        <i class="fas fa-pen"></i>
+                                    </button>
+                                </div>
+                            </td>
+                        </tr>
+                    `;
+
+                    const nuevaFilaElemento = crearElementoDesdeHTML(nuevaFila);
+
+                    if (fila) {
+                        fila.replaceWith(nuevaFilaElemento);
+                    } else {
+                        tablaAsignados.insertAdjacentElement("afterbegin", nuevaFilaElemento);
+                    }
+
+                    asignarEventosEditar();
+                    cancelarEdicion();
+                    asignarEventosEliminar();
+                    actualizarOpcionesConductorVisual();
+
+                } else {
+                    alertify.error("❌ " + result.message);
+                }
+            } catch (err) {
+                console.error(err);
+                alertify.error("❌ Error de conexión al servidor.");
+            }
+        });
+    });
+
+</script>
+
+<script>
+    function asignarEventosEliminar() {
+        document.querySelectorAll(".btnEliminarRuta").forEach(btn => {
+            btn.addEventListener("click", function () {
+                const idRuta = this.dataset.id;
+
+                alertify.confirm(
+                    "Confirmar eliminación",
+                    "¿Estás seguro de que deseas eliminar esta ruta?",
+                    function () {
+                        fetch(`/api/ruta/${idRuta}`, {
+                            method: "DELETE",
+                            headers: {
+                                "Authorization": `Bearer ${localStorage.getItem("access_token")}`
+                            }
+                        })
+                            .then(res => res.json())
+                            .then(data => {
+                                if (data.success) {
+                                    alertify.success("🗑️ " + data.message);
+                                    setTimeout(() => location.reload(), 1000);
+                                } else {
+                                    alertify.error("❌ " + data.message);
+                                }
+                            })
+                            .catch(err => {
+                                console.error(err);
+                                alertify.error("❌ Error de conexión al eliminar.");
+                            });
+                    },
+                    function () {
+                        alertify.message("🚫 Eliminación cancelada");
+                    }
+                );
+            });
+        });
+    }
+</script>
+
+
+
+
+
+
+<!-- jQuery requerido por Foundation -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/2.1.3/jquery.min.js"></script>
+
+<!-- JS de Foundation -->
+<script src="https://cdn.jsdelivr.net/foundation/5.5.0/js/foundation.min.js"></script>
+
+<!-- JS de Alertify.js -->
+<script src="https://cdn.jsdelivr.net/npm/alertifyjs@1.13.1/build/alertify.min.js"></script>
+
+
+<script async defer
+    src="https://maps.googleapis.com/maps/api/js?key=AIzaSyAABGMtrjdoukcZT2XUBLbtLLgeLRxuZHo&libraries=places&callback=initMap">
+    </script>
+
+
+{% endblock %}

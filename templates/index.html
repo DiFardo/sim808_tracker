@@ -1,88 +1,71 @@
 {% extends "pagina_maestra.html" %}
 
-{% block titulo %}Admin Panel{% endblock %}
+{% block titulo %}Panel de Monitoreo{% endblock %}
 
 {% block link %}
 <link rel="preconnect" href="https://fonts.gstatic.com" />
 <link href="{{ url_for('static', filename='css/app.css') }}" rel="stylesheet" />
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600&display=swap" rel="stylesheet" />
-<title>Sistema de monitoreo</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet" />
+<title>Sistema de Monitoreo</title>
 
 <style>
-  /* Estilos generales para cartas */
-  .card {
-    border-radius: 12px;
-    box-shadow: 0 4px 12px rgb(0 0 0 / 0.1);
-    transition: box-shadow 0.3s ease, transform 0.3s ease;
-    height: 100%;
-    display: flex;
-    flex-direction: column;
+  body {
+    background: #f1f5f9;
+    font-family: 'Inter', sans-serif;
+  }
+  .dashboard-card {
+    border-radius: 1rem;
     background: #fff;
+    transition: transform 0.2s, box-shadow 0.2s;
+    height: 100%;
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.06);
   }
-  .card:hover {
-    box-shadow: 0 10px 30px rgb(0 0 0 / 0.15);
-    transform: translateY(-6px);
+  .dashboard-card:hover {
+    transform: translateY(-4px);
+    box-shadow: 0 12px 24px rgba(0, 0, 0, 0.1);
   }
-  .stat {
-    font-size: 3rem;
-    color: #1e40af;
+  .icon-circle {
+    width: 64px;
+    height: 64px;
+    background: linear-gradient(135deg, #3b82f6, #2563eb);
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  .icon-circle i {
+    color: white;
+    width: 28px;
+    height: 28px;
   }
   .card-title {
     font-weight: 600;
-    color: #374151;
-    margin-bottom: 0.5rem;
+    color: #1f2937;
   }
-  .text-muted {
+  .badge {
     font-size: 0.9rem;
-    color: #6b7280;
+    padding: 0.5em 0.75em;
+    border-radius: 12px;
   }
-  .flotas-info {
-    display: flex;
-    flex-direction: column;
-    justify-content: center;
-  }
-  .flotas-info h1 {
-    font-size: 3rem;
-    font-weight: 700;
-    color: #111827;
-  }
-  .flotas-info .status {
-    margin-top: 0.5rem;
-    font-weight: 600;
-  }
-  .flotas-info .status span {
-    padding: 6px 12px;
-    border-radius: 20px;
-    font-size: 0.95rem;
-    color: #fff;
-    margin-right: 8px;
-  }
-  .status-disponible {
-    background-color: #10b981;
-  }
-  .status-no-disponible {
-    background-color: #ef4444;
-  }
-  .card-body.scrollable {
+  .scrollable {
     max-height: 320px;
     overflow-y: auto;
   }
-  @media (max-width: 576px) {
-    .card-body > .d-flex {
-      flex-direction: column;
-      align-items: flex-start !important;
+  @media (max-width: 767.98px) {
+    .dashboard-card {
+      padding: 1rem !important;
+      text-align: center;
     }
-    .card-body > .d-flex > div + div {
-      margin-top: 0.5rem;
+    .row.g-4 > div {
+      flex: 0 0 100%;
+      max-width: 100%;
     }
-  }
-  .list-group-item {
-    font-weight: 500;
-    font-size: 1rem;
-  }
-  .badge {
-    font-size: 1rem;
-    padding: 0.35em 0.8em;
+    .icon-circle {
+      margin: 0 auto;
+    }
+    h2.fw-bold {
+      font-size: 1.75rem;
+    }
   }
 </style>
 {% endblock %}
@@ -90,109 +73,104 @@
 {% block contenido %}
 <div id="content">
   <div class="main-content">
-    <h1 class="h3 mb-4"><strong>Analytics</strong> Dashboard</h1>
+    <div class="container py-4">
+      <h2 class="mb-4">Dashboard de Monitoreo</h2>
 
-    <!-- PRIMERA FILA: 3 cartas -->
-    <div class="row g-4 mb-4">
-      <div class="col-sm-12 col-md-6 col-lg-4">
-        <div class="card p-4 d-flex align-items-center">
-          <i data-feather="truck" class="stat mb-3"></i>
-          <div class="flotas-info text-center">
-            <h5 class="card-title">Flotas Totales</h5>
-            <h1>{{ cantidad_flotas + cantidad_flotas_inactivas }}</h1>
-            <div>
-              <span class="status status-disponible">Disponibles: {{ cantidad_flotas }}</span>
-              <span class="status status-no-disponible">No disponibles: {{ cantidad_flotas_inactivas }}</span>
+      <div class="row g-4">
+        <div class="col-md-4">
+          <div class="card dashboard-card p-4 text-center">
+            <div class="icon-circle mx-auto">
+              <i data-feather="truck"></i>
+            </div>
+            <h6 class="text-muted mt-3">Flotas Totales</h6>
+            <h2 class="fw-bold">{{ cantidad_flotas + cantidad_flotas_inactivas }}</h2>
+            <div class="d-flex justify-content-center gap-2 mt-2 flex-wrap">
+              <span class="badge bg-success">Disponibles: {{ cantidad_flotas }}</span>
+              <span class="badge bg-danger">No disponibles: {{ cantidad_flotas_inactivas }}</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="col-md-4">
+          <div class="card dashboard-card p-4">
+            <h6 class="card-title">Rutas Programadas Hoy</h6>
+            <div class="scrollable">
+              {% if rutas_hoy|length == 0 %}
+                <p class="text-muted">No hay rutas programadas.</p>
+              {% else %}
+                <ul class="list-group list-group-flush">
+                  {% for ruta in rutas_hoy %}
+                    <li class="list-group-item">
+                      <strong>{{ ruta.conductor }}</strong>: {{ ruta.origen }} &rarr; {{ ruta.destino }}
+                    </li>
+                  {% endfor %}
+                </ul>
+              {% endif %}
+            </div>
+          </div>
+        </div>
+
+        <div class="col-md-4">
+          <div class="card dashboard-card p-4">
+            <h6 class="card-title">Vehículos en Ruta</h6>
+            <div class="scrollable">
+              {% if vehiculos_en_ruta|length == 0 %}
+                <p class="text-muted">No hay vehículos en ruta.</p>
+              {% else %}
+                <ul class="list-group list-group-flush">
+                  {% for vehiculo in vehiculos_en_ruta %}
+                    <li class="list-group-item d-flex justify-content-between">
+                      {{ vehiculo.placa }}
+                      <span class="badge bg-primary">{{ vehiculo.cantidad_asignada }}</span>
+                    </li>
+                  {% endfor %}
+                </ul>
+              {% endif %}
             </div>
           </div>
         </div>
       </div>
 
-      <div class="col-sm-12 col-md-6 col-lg-4">
-        <div class="card">
-          <div class="card-body scrollable">
-            <h5 class="card-title mb-3">Rutas Programadas Hoy</h5>
-            {% if rutas_hoy|length == 0 %}
-              <p class="text-muted">No hay rutas programadas para hoy.</p>
-            {% else %}
-              <ul class="list-group">
-                {% for ruta in rutas_hoy %}
-                  <li class="list-group-item">
-                    <strong>{{ ruta.conductor }}</strong> = {{ ruta.origen }} &rarr; {{ ruta.destino }}
-                  </li>
+      <div class="row g-4 mt-4">
+        <div class="col-md-6">
+          <div class="card dashboard-card">
+            <div class="card-body">
+              <h6 class="card-title">Días con Más Rutas</h6>
+              <canvas id="chart-rutas-dias"></canvas>
+              <ul class="mt-3">
+                {% for dia in dias_top_rutas %}
+                  <li><strong>{{ dia.fecha.strftime('%d %b %Y') }}</strong>: {{ dia.total_rutas }} rutas</li>
                 {% endfor %}
               </ul>
-            {% endif %}
+            </div>
           </div>
         </div>
-      </div>
 
-      <div class="col-sm-12 col-md-6 col-lg-4">
-        <div class="card">
-          <div class="card-body scrollable">
-            <h5 class="card-title mb-3">Vehículos en Ruta</h5>
-            {% if vehiculos_en_ruta|length == 0 %}
-              <p class="text-muted">No hay vehículos asignados en ruta.</p>
-            {% else %}
-              <ul class="list-group">
-                {% for vehiculo in vehiculos_en_ruta %}
-                  <li class="list-group-item d-flex justify-content-between align-items-center">
-                    <span>{{ vehiculo.placa }}</span>
-                    <span class="badge bg-primary rounded-pill">{{ vehiculo.cantidad_asignada }}</span>
-                  </li>
-                {% endfor %}
-              </ul>
-            {% endif %}
+        <div class="col-md-6">
+          <div class="card dashboard-card p-4">
+            <h6 class="card-title">Conductores Disponibles</h6>
+            <div class="scrollable">
+              {% if conductores_disponibles|length == 0 %}
+                <p class="text-muted">No hay conductores disponibles.</p>
+              {% else %}
+                <ul class="list-group list-group-flush">
+                  {% for conductor in conductores_disponibles %}
+                    <li class="list-group-item d-flex justify-content-between">
+                      {{ conductor.nombre }} {{ conductor.apellido }}
+                      {% if conductor.asignado %}
+                        <span class="badge bg-danger">Asignado</span>
+                      {% else %}
+                        <span class="badge bg-success">Disponible</span>
+                      {% endif %}
+                    </li>
+                  {% endfor %}
+                </ul>
+              {% endif %}
+            </div>
           </div>
         </div>
       </div>
     </div>
-
-    <!-- SEGUNDA FILA: Gráfico y otra carta al lado -->
-    <div class="row g-4">
-      <div class="col-12 col-md-6 col-lg-6 col-xxl-4">
-        <div class="card flex-fill w-100">
-          <div class="card-header">
-            <h5 class="card-title mb-0">Días con Más Rutas Programadas</h5>
-          </div>
-          <div class="card-body" style="min-height: 320px;">
-            <canvas id="chart-rutas-dias" style="max-height: 250px;"></canvas>
-            <ul class="mt-3 list-unstyled">
-              {% for dia in dias_top_rutas %}
-              <li>
-                <strong>{{ dia.fecha.strftime('%d %b %Y') }}</strong>: {{ dia.total_rutas }} rutas
-              </li>
-              {% endfor %}
-            </ul>
-          </div>
-        </div>
-      </div>
-
-      <div class="col-12 col-md-6 col-lg-6 col-xxl-4">
-        <div class="card flex-fill w-100">
-          <div class="card-body scrollable">
-            <h5 class="card-title mb-3">Conductores</h5>
-            {% if conductores_disponibles|length == 0 %}
-              <p class="text-muted">No hay conductores disponibles.</p>
-            {% else %}
-              <ul class="list-group">
-                {% for conductor in conductores_disponibles %}
-                  <li class="list-group-item d-flex justify-content-between align-items-center">
-                    {{ conductor.nombre }} {{ conductor.apellido }}
-                    {% if conductor.asignado %}
-                      <span class="badge bg-danger rounded-pill">Asignado</span>
-                    {% else %}
-                      <span class="badge bg-success rounded-pill">Disponible</span>
-                    {% endif %}
-                  </li>
-                {% endfor %}
-              </ul>
-            {% endif %}
-          </div>
-        </div>
-      </div>
-    </div>
-
   </div>
 </div>
 {% endblock %}
@@ -204,41 +182,27 @@
   document.addEventListener("DOMContentLoaded", function () {
     feather.replace();
 
-    const datosDias = {
-      labels: [{% for dia in dias_top_rutas %}'{{ dia.fecha.strftime('%d %b') }}'{% if not loop.last %}, {% endif %}{% endfor %}],
-      datasets: [{
-        data: [{% for dia in dias_top_rutas %}{{ dia.total_rutas }}{% if not loop.last %}, {% endif %}{% endfor %}],
-        backgroundColor: [
-          '#4e73df', '#1cc88a', '#36b9cc', '#f6c23e', '#e74a3b'
-        ],
-        hoverBackgroundColor: [
-          '#2e59d9', '#17a673', '#2c9faf', '#dda20a', '#be2617'
-        ],
-        borderWidth: 1
-      }]
-    };
-
-    const configDias = {
+    const ctx = document.getElementById('chart-rutas-dias').getContext('2d');
+    const chart = new Chart(ctx, {
       type: 'doughnut',
-      data: datosDias,
+      data: {
+        labels: [{% for dia in dias_top_rutas %}'{{ dia.fecha.strftime('%d %b') }}'{% if not loop.last %}, {% endif %}{% endfor %}],
+        datasets: [{
+          data: [{% for dia in dias_top_rutas %}{{ dia.total_rutas }}{% if not loop.last %}, {% endif %}{% endfor %}],
+          backgroundColor: ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#6366f1'],
+          hoverOffset: 10
+        }]
+      },
       options: {
         responsive: true,
-        maintainAspectRatio: false,
-        cutout: 70,
         plugins: {
           legend: {
             position: 'bottom',
-            labels: { padding: 20 }
-          },
-          tooltip: {
-            enabled: true
+            labels: { color: '#374151' }
           }
         }
       }
-    };
-
-    const ctxDias = document.getElementById('chart-rutas-dias').getContext('2d');
-    new Chart(ctxDias, configDias);
+    });
   });
 </script>
 {% endblock %}

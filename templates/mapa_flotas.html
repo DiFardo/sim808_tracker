@@ -129,7 +129,10 @@
               {% for ruta in rutas_hoy %}
               <div class="fleet-box" data-ruta-id="{{ ruta.id }}" data-origen-lat="{{ ruta.origen_lat }}"
                 data-origen-lon="{{ ruta.origen_lon }}" data-destino-lat="{{ ruta.destino_lat }}"
-                data-destino-lon="{{ ruta.destino_lon }}">
+                data-destino-lon="{{ ruta.destino_lon }}"
+                data-conductor-id="{{ ruta.id_persona if ruta.id_persona else '' }}">
+
+
                 {% if ruta.hora_salida %}
                 <button class="btn btn-secondary btn-sm" disabled>🛣️ Vehículo en recorrido</button>
                 {% else %}
@@ -140,11 +143,10 @@
                 <!-- <button class="btn btn-danger btn-sm btn-finalizar-ruta" data-id-ruta="{{ ruta.id }}">
                   ⛔ Finalizar recorrido
                 </button> -->
-
-
-
-                <div class="fleet-title">{{ ruta.conductor }}</div>
-
+                <!-- Información del conductor -->
+                <div class="fleet-title">
+                  {{ ruta.conductor if ruta.conductor else "Conductor: No asignado" }}
+                </div>
                 <div class="time">
                   🗓️ <strong>Fecha:</strong> {{ ruta.fecha }}
                 </div>
@@ -192,7 +194,17 @@
   let directionsRenderer;
   let marcadorOrigen;
   let marcadorDestino;
-  let rutaEnInicio = false; // 🔁 bandera global para saber si se presionó "Iniciar Ruta"
+  let marcadorMovil = null;
+  let circuloMovil = null;
+  let rutaEnInicio = false;
+  let ultimaLat = null;
+  let ultimaLon = null;
+  let intervaloSeguimiento = null;
+  let rutasActivas = new Set();
+  let rutaSeleccionada = null;
+  let rutaPolyline = null;
+  let distanciaTotal = 0;
+  let alertaLlegadaMostrada = false;
 
   function initMap() {
     const centro = { lat: -6.7714, lng: -79.8409 };
@@ -209,10 +221,88 @@
     });
   }
 
+  function marcarTarjetaActiva(id) {
+    document.querySelectorAll('.fleet-box').forEach(b => b.classList.remove('active', 'bg-info-subtle'));
+    const box = document.querySelector(`.fleet-box[data-ruta-id="${id}"]`);
+    if (box) box.classList.add('active', 'bg-info-subtle');
+    localStorage.setItem("ruta_activa", id);
+  }
+
+  function actualizarDistanciaRestante(posActual) {
+    if (!rutaPolyline) return;
+    let minDist = Infinity;
+    const path = rutaPolyline.getPath();
+    let idxCercano = 0;
+
+    for (let i = 0; i < path.getLength(); i++) {
+      const punto = path.getAt(i);
+      const dist = google.maps.geometry.spherical.computeDistanceBetween(
+        new google.maps.LatLng(posActual.lat, posActual.lng), punto
+      );
+      if (dist < minDist) {
+        minDist = dist;
+        idxCercano = i;
+      }
+    }
+
+    let distanciaRestante = 0;
+    for (let i = idxCercano; i < path.getLength() - 1; i++) {
+      const desde = path.getAt(i);
+      const hasta = path.getAt(i + 1);
+      distanciaRestante += google.maps.geometry.spherical.computeDistanceBetween(desde, hasta);
+    }
+
+    // Mostrar alerta al llegar cerca
+    if (distanciaRestante < 500 && !alertaLlegadaMostrada) {
+      alertify.success("📍 Estás por llegar al destino.");
+      alertaLlegadaMostrada = true;
+    } else if (distanciaRestante >= 500) {
+      alertaLlegadaMostrada = false;
+    }
+
+    const idActiva = localStorage.getItem("ruta_activa");
+    if (idActiva) {
+      const card = document.querySelector(`.fleet-box[data-ruta-id="${idActiva}"]`);
+      if (card) {
+        let divDistancia = card.querySelector(".distancia-km");
+        if (!divDistancia) {
+          divDistancia = document.createElement("div");
+          divDistancia.classList.add("time", "distancia-km");
+          card.appendChild(divDistancia);
+        }
+        divDistancia.innerHTML = `📍 <strong>Restante:</strong> ${(distanciaRestante / 1000).toFixed(2)} km`;
+      }
+    }
+  }
+
+  function calcularDistanciaRuta(result) {
+    distanciaTotal = 0;
+    const route = result.routes[0];
+    route.legs.forEach(leg => {
+      distanciaTotal += leg.distance.value;
+    });
+    alertify.message(`📏 Del origen al destino hay ${(distanciaTotal / 1000).toFixed(2)} km por recorrer.`);
+
+    const idActiva = localStorage.getItem("ruta_activa");
+    if (idActiva) {
+      const card = document.querySelector(`.fleet-box[data-ruta-id="${idActiva}"]`);
+      if (card) {
+        let divDistancia = card.querySelector(".distancia-km");
+        if (!divDistancia) {
+          divDistancia = document.createElement("div");
+          divDistancia.classList.add("time", "distancia-km");
+          card.appendChild(divDistancia);
+        }
+        divDistancia.innerHTML = `📍 <strong>Distancia:</strong> ${(distanciaTotal / 1000).toFixed(2)} km`;
+      }
+    }
+  }
+
   function trazarRuta(origen, destino) {
     directionsRenderer.set('directions', null);
     if (marcadorOrigen) marcadorOrigen.setMap(null);
     if (marcadorDestino) marcadorDestino.setMap(null);
+    if (rutaPolyline) rutaPolyline.setMap(null);
 
     const request = {
       origin: origen,
@@ -223,6 +313,15 @@
     directionsService.route(request, function (result, status) {
       if (status === 'OK') {
         directionsRenderer.setDirections(result);
+        calcularDistanciaRuta(result);
+
+        rutaPolyline = new google.maps.Polyline({
+          path: result.routes[0].overview_path,
+          strokeColor: '#007bff',
+          strokeOpacity: 0.6,
+          strokeWeight: 4,
+          map: map
+        });
 
         marcadorOrigen = new google.maps.Marker({
           position: origen,
@@ -238,27 +337,15 @@
           title: "Origen"
         });
 
-        const radioPrecision = 10;
-        new google.maps.Circle({
-          strokeColor: "#4285F4",
-          strokeOpacity: 0.5,
-          strokeWeight: 1,
-          fillColor: "#4285F4",
-          fillOpacity: 0.2,
-          map: map,
-          center: origen,
-          radius: radioPrecision
-        });
-
         marcadorDestino = new google.maps.Marker({
           position: destino,
           map: map,
           icon: {
             url: "data:image/svg+xml;charset=UTF-8," + encodeURIComponent(`
-              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 384 512" width="40" height="40">
-                <path fill="#FF3B3B" stroke="#1A1A4A" stroke-width="15" d="M192 0C86 0 0 86 0 192c0 87.7 104.7 209.7 
+              <svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 384 512\" width=\"40\" height=\"40\">
+                <path fill=\"#FF3B3B\" stroke=\"#1A1A4A\" stroke-width=\"15\" d=\"M192 0C86 0 0 86 0 192c0 87.7 104.7 209.7 
                 160 272.7 7.7 8.9 21.3 8.9 29 0C279.3 401.7 384 279.7 384 192 384 86 298 0 192 0zm0 272c-44.2 
-                0-80-35.8-80-80s35.8-80 80-80 80 35.8 80 80-35.8 80-80 80z"/>
+                0-80-35.8-80-80s35.8-80 80-80 80 35.8 80 80-35.8 80-80 80z\"/>
               </svg>
             `),
             scaledSize: new google.maps.Size(40, 40),
@@ -266,210 +353,325 @@
           },
           title: "Destino"
         });
-
-        rutaEnInicio = false; // ✅ reset bandera
-      } else {
-        if (rutaEnInicio) {
-          alertify.message("🔄 Dame un momento mientras se traza la ruta...");
-          rutaEnInicio = false;
-        }
       }
     });
   }
 
-  document.addEventListener('DOMContentLoaded', function () {
-    const toggleBtn = document.getElementById('toggle-sidebar-btn');
-    const sidebar = document.getElementById('fleet-sidebar');
-    const mapContainer = document.getElementById('map-container');
-    const icon = toggleBtn.querySelector('i');
-    let isVisible = true;
+  function actualizarSeguimiento(posicion) {
+    actualizarDistanciaRestante(posicion);
+  }
 
-    toggleBtn.addEventListener('click', function () {
-      if (isVisible) {
-        sidebar.style.display = 'none';
-        mapContainer.classList.remove('col-md-8');
-        mapContainer.classList.add('col-md-12');
-        toggleBtn.style.left = '10px';
-        icon.classList.remove('fa-chevron-left');
-        icon.classList.add('fa-chevron-right');
-      } else {
-        sidebar.style.display = 'block';
-        mapContainer.classList.remove('col-md-12');
-        mapContainer.classList.add('col-md-8');
-        toggleBtn.style.left = '33.33%';
-        icon.classList.remove('fa-chevron-right');
-        icon.classList.add('fa-chevron-left');
+  function verificarDesvio(pos) {
+    if (!rutaPolyline) return;
+    const path = rutaPolyline.getPath();
+    let desviado = true;
+
+    for (let i = 0; i < path.getLength(); i++) {
+      const punto = path.getAt(i);
+      const distancia = google.maps.geometry.spherical.computeDistanceBetween(new google.maps.LatLng(pos.lat, pos.lng), punto);
+      if (distancia < 50) { // menos de 50 metros es aceptable
+        desviado = false;
+        break;
       }
-      isVisible = !isVisible;
-    });
+    }
 
+    if (desviado) {
+      alertify.error("⚠️ Alerta: ¡Posible desvío detectado!");
+    }
+  }
+
+  let rutaSecundariaPolyline = null;
+  let rutaAlternativaCoords = [];
+  let ultimaLatLon = null;
+
+
+  function iniciarMonitoreoTiempoReal(idRuta) {
+    if (intervaloSeguimiento) clearInterval(intervaloSeguimiento);
+
+    intervaloSeguimiento = setInterval(() => {
+      fetch(`/api/ultima_ubicacion?id_ruta=${idRuta}`)
+        .then(res => res.json())
+        .then(data => {
+          console.log("📡 Datos de ubicación recibidos:", data);
+          if (data.success && data.lat && data.lon) {
+            const nuevaLat = parseFloat(data.lat);
+            const nuevaLon = parseFloat(data.lon);
+
+            if (nuevaLat !== ultimaLat || nuevaLon !== ultimaLon) {
+              ultimaLat = nuevaLat;
+              ultimaLon = nuevaLon;
+
+              const nuevaPos = { lat: nuevaLat, lng: nuevaLon };
+              procesarUbicacionConSnap(nuevaPos); // Solo esto
+            }
+          }
+        })
+        .catch(error => {
+          console.error("❌ Error al obtener ubicación del vehículo:", error);
+        });
+    }, 5000);
+  }
+
+  async function procesarUbicacionConSnap(nuevaPos) {
+    try {
+      const response = await fetch(`https://roads.googleapis.com/v1/snapToRoads?path=${nuevaPos.lat},${nuevaPos.lng}&interpolate=false&key=AIzaSyAABGMtrjdoukcZT2XUBLbtLLgeLRxuZHo`);
+      const data = await response.json();
+
+      if (data.snappedPoints && data.snappedPoints.length > 0) {
+        const snapLat = data.snappedPoints[0].location.latitude;
+        const snapLng = data.snappedPoints[0].location.longitude;
+        const puntoAjustado = { lat: snapLat, lng: snapLng };
+
+        const distancia = google.maps.geometry.spherical.computeDistanceBetween(
+          new google.maps.LatLng(nuevaPos.lat, nuevaPos.lng),
+          new google.maps.LatLng(puntoAjustado.lat, puntoAjustado.lng)
+        );
+
+        if (distancia < 80) {
+          actualizarDistanciaRestante(puntoAjustado);
+          rutaAlternativaCoords = [];
+          if (rutaSecundariaPolyline) {
+            rutaSecundariaPolyline.setMap(null);
+            rutaSecundariaPolyline = null;
+          }
+        } else {
+          // 🚨 Desvío detectado: acumular y registrar en backend
+          rutaAlternativaCoords.push(puntoAjustado);
+
+          // Dibujar línea roja
+          if (!rutaSecundariaPolyline) {
+            rutaSecundariaPolyline = new google.maps.Polyline({
+              path: rutaAlternativaCoords,
+              strokeColor: '#FF0000',
+              strokeOpacity: 0.9,
+              strokeWeight: 4,
+              map: map
+            });
+          } else {
+            rutaSecundariaPolyline.setPath(rutaAlternativaCoords);
+          }
+
+          alertify.warning("⚠️ Trazando ruta alternativa por desvío...");
+
+          // 🔁 Guardar desvío en la base de datos
+          const idRuta = localStorage.getItem("ruta_activa");
+          if (idRuta) {
+            fetch("/api/registrar_desvio", {
+              method: "POST",
+              headers: {
+                "Content-Type": "application/json"
+              },
+              body: JSON.stringify({
+                id_ruta: idRuta,
+                lat: snapLat,
+                lon: snapLng
+              })
+            }).catch(err => console.error("❌ Error al guardar desvío:", err));
+          }
+        }
+
+        // 🔁 Marcador y círculo ajustados
+        if (marcadorMovil) marcadorMovil.setMap(null);
+        marcadorMovil = new google.maps.Marker({
+          position: puntoAjustado,
+          map: map,
+          icon: {
+            path: google.maps.SymbolPath.CIRCLE,
+            scale: 6,
+            fillColor: "#ff0000",
+            fillOpacity: 1,
+            strokeWeight: 2,
+            strokeColor: "#ffffff"
+          },
+          title: "Ubicación del vehículo"
+        });
+
+        if (circuloMovil) circuloMovil.setMap(null);
+        circuloMovil = new google.maps.Circle({
+          strokeColor: "#4285F4",
+          strokeOpacity: 0.5,
+          strokeWeight: 1,
+          fillColor: "#4285F4",
+          fillOpacity: 0.2,
+          map: map,
+          center: puntoAjustado,
+          radius: 10
+        });
+
+        ultimaLatLon = puntoAjustado;
+      }
+    } catch (error) {
+      console.error("❌ Error al usar Snap to Roads:", error);
+    }
+  }
+
+  function esperarYActualizarRuta(idRuta, box, boton) {
+    boton.innerHTML = `<i class='fas fa-clock'></i> Vehículo en espera`;
+    const checkOrigen = setInterval(() => {
+      fetch(`/api/obtener_origen_ruta/${idRuta}`)
+        .then(res => res.json())
+        .then(data => {
+          if (data.success) {
+            clearInterval(checkOrigen);
+            box.dataset.origenLat = data.lat;
+            box.dataset.origenLon = data.lon;
+
+            const origen = { lat: parseFloat(data.lat), lng: parseFloat(data.lon) };
+            const destino = {
+              lat: parseFloat(box.dataset.destinoLat),
+              lng: parseFloat(box.dataset.destinoLon)
+            };
+
+            map.setCenter(origen);
+            trazarRuta(origen, destino);
+            iniciarMonitoreoTiempoReal(idRuta);
+            actualizarContenidoTarjetas();
+
+            if (boton) {
+              boton.innerHTML = `🛣️ Vehículo en recorrido`;
+              alertify.success("✅ Vehículo por salir: origen registrado.");
+            }
+
+            marcarTarjetaActiva(idRuta);
+          }
+        });
+    }, 5000);
+  }
+
+  function actualizarContenidoTarjetas() {
+    fetch('/api/rutas_programadas_hoy')
+      .then(res => res.json())
+      .then(data => {
+        if (data.success && Array.isArray(data.rutas)) {
+          data.rutas.forEach(ruta => {
+            const card = document.querySelector(`.fleet-box[data-ruta-id="${ruta.id}"]`);
+            if (!card) return;
+
+            card.dataset.origenLat = ruta.origen_lat;
+            card.dataset.origenLon = ruta.origen_lon;
+
+            const salida = card.querySelector(".hora-salida");
+            if (salida) salida.innerHTML = ruta.hora_salida
+              ? `🕓 <strong>Salida:</strong> ${ruta.hora_salida}`
+              : `🕓 <strong>Salida:</strong> Aún no parte el vehículo`;
+          });
+        }
+      });
+  }
+
+  document.addEventListener('DOMContentLoaded', function () {
     const fleetBoxes = document.querySelectorAll('.fleet-box');
-    let selectedId = null;
-
-    function marcarSeleccion(box) {
-      fleetBoxes.forEach(b => b.classList.remove('active'));
-      box.classList.add('active');
-    }
-
-    function guardarSeleccion(box) {
-      localStorage.setItem('ruta_activa', box.dataset.rutaId);
-    }
-
-    function obtenerSeleccionGuardada() {
-      return localStorage.getItem('ruta_activa');
-    }
-
-    function limpiarSeleccion() {
-      localStorage.removeItem('ruta_activa');
-    }
 
     fleetBoxes.forEach(box => {
       const rutaId = box.dataset.rutaId;
+      const btnIniciar = box.querySelector('.btn-iniciar-ruta');
+
+      if (btnIniciar) {
+        const conductorId = box.dataset.conductorId;
+
+        // Deshabilitar si no tiene conductor asignado
+        if (!conductorId || conductorId === "null") {
+          btnIniciar.disabled = true;
+          btnIniciar.classList.add("disabled");
+          btnIniciar.innerHTML = "🚫 Sin conductor";
+        } else {
+          btnIniciar.disabled = false;
+          btnIniciar.classList.remove("disabled");
+          btnIniciar.innerHTML = "▶️ Iniciar Ruta";
+
+          // Evento normal de iniciar ruta
+          btnIniciar.addEventListener('click', function (e) {
+            e.stopPropagation();
+            rutaEnInicio = true;
+
+            btnIniciar.disabled = true;
+            btnIniciar.innerHTML = `<i class='fas fa-spinner fa-spin'></i> Enviando...`;
+
+            fetch("/api/marcar_ruta_activa", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ id_ruta: rutaId })
+            })
+              .then(res => res.json())
+              .then(data => {
+                if (data.success) {
+                  btnIniciar.classList.remove('btn-primary');
+                  btnIniciar.classList.add('btn-warning');
+                  btnIniciar.disabled = true;
+                  esperarYActualizarRuta(rutaId, box, btnIniciar);
+                } else {
+                  alertify.error("❌ Error: " + data.message);
+                  btnIniciar.disabled = false;
+                  btnIniciar.innerHTML = `▶️ Iniciar Ruta`;
+                }
+              })
+              .catch(err => {
+                console.error("Error:", err);
+                alertify.error("❌ Error al contactar al servidor");
+                btnIniciar.disabled = false;
+                btnIniciar.innerHTML = `▶️ Iniciar Ruta`;
+              });
+          });
+        }
+      }
+
 
       box.addEventListener('click', function () {
         const yaSeleccionada = box.classList.contains('active');
 
         if (yaSeleccionada) {
-          box.classList.remove('active');
+          box.classList.remove('active', 'bg-info-subtle');
           directionsRenderer.set('directions', null);
           if (marcadorOrigen) marcadorOrigen.setMap(null);
           if (marcadorDestino) marcadorDestino.setMap(null);
-          limpiarSeleccion();
         } else {
-          marcarSeleccion(box);
-          guardarSeleccion(box);
+          marcarTarjetaActiva(rutaId);
 
-          const origen = {
-            lat: parseFloat(this.dataset.origenLat),
-            lng: parseFloat(this.dataset.origenLon)
-          };
-          const destino = {
-            lat: parseFloat(this.dataset.destinoLat),
-            lng: parseFloat(this.dataset.destinoLon)
-          };
+          const origenLat = parseFloat(box.dataset.origenLat);
+          const origenLon = parseFloat(box.dataset.origenLon);
 
-          map.setCenter(origen);
-          trazarRuta(origen, destino);
+          if (!origenLat || !origenLon) {
+            alertify.message("⏳ La ruta aún se está preparando");
+            esperarYActualizarRuta(rutaId, box, null);
+          } else {
+            const origen = { lat: origenLat, lng: origenLon };
+            const destino = {
+              lat: parseFloat(box.dataset.destinoLat),
+              lng: parseFloat(box.dataset.destinoLon)
+            };
+
+            map.setCenter(origen);
+            trazarRuta(origen, destino);
+            iniciarMonitoreoTiempoReal(rutaId);
+          }
         }
       });
     });
 
-    // ✅ Botón "Iniciar Ruta"
-    document.querySelectorAll('.btn-iniciar-ruta').forEach(btn => {
-      btn.addEventListener('click', function (e) {
-        e.stopPropagation();
-        rutaEnInicio = true; // 🔁 activamos la bandera
-
-        const idRuta = this.dataset.idRuta;
-        const boton = this;
-
-        boton.disabled = true;
-        boton.innerHTML = `<i class="fas fa-spinner fa-spin"></i> Enviando...`;
-
-        fetch("/api/marcar_ruta_activa", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ id_ruta: idRuta })
-        })
-          .then(res => res.json())
-          .then(data => {
-            if (data.success) {
-              const nuevaHoraSalida = data.hora_salida;
-
-              if (nuevaHoraSalida && nuevaHoraSalida !== "null") {
-                boton.classList.remove('btn-primary');
-                boton.classList.add('btn-secondary');
-                boton.innerHTML = `<i class="fas fa-road"></i> Vehículo en recorrido`;
-              } else {
-                boton.classList.remove('btn-primary');
-                boton.classList.add('btn-warning');
-                boton.innerHTML = `<i class="fas fa-clock"></i> Vehículo en espera`;
-              }
-            } else {
-              alert("❌ Error: " + data.message);
-              boton.disabled = false;
-              boton.innerHTML = `<i class="fas fa-play"></i> Iniciar Ruta`;
-            }
-          })
-          .catch(err => {
-            console.error("Error:", err);
-            alert("❌ Error al contactar al servidor");
-            boton.disabled = false;
-            boton.innerHTML = `<i class="fas fa-play"></i> Iniciar Ruta`;
-          });
-      });
-    });
-
-    // ✅ Al cargar la página, si hay una ruta activa, vuelve a trazarla
-    window.addEventListener('load', function () {
-      const idGuardado = obtenerSeleccionGuardada();
-      if (idGuardado) {
-        const boxActiva = [...fleetBoxes].find(b => b.dataset.rutaId === idGuardado);
-        if (boxActiva) {
-          marcarSeleccion(boxActiva);
-
-          const origen = {
-            lat: parseFloat(boxActiva.dataset.origenLat),
-            lng: parseFloat(boxActiva.dataset.origenLon)
-          };
-          const destino = {
-            lat: parseFloat(boxActiva.dataset.destinoLat),
-            lng: parseFloat(boxActiva.dataset.destinoLon)
-          };
-
-          map.setCenter(origen);
-          trazarRuta(origen, destino);
-        }
-      }
-    });
+    setInterval(actualizarContenidoTarjetas, 15000);
   });
-</script>
-<script>
-  function actualizarContenidoRutas(rutasActualizadas) {
-    rutasActualizadas.forEach(ruta => {
-      const card = document.querySelector(`.fleet-box[data-ruta-id="${ruta.id}"]`);
-      if (!card) return;
 
-      // 🔁 BOTÓN
-      const boton = card.querySelector("button");
-      if (boton) {
-        if (ruta.hora_salida) {
-          boton.className = "btn btn-secondary btn-sm";
-          boton.innerHTML = "🛣️ Vehículo en recorrido";
-          boton.disabled = true;
-        } else {
-          boton.className = "btn btn-warning btn-sm";
-          boton.innerHTML = "🚦 Vehículo en espera";
-          boton.disabled = true;
-        }
+  window.addEventListener('load', function () {
+    const rutaIdGuardada = localStorage.getItem("ruta_activa");
+    if (rutaIdGuardada) {
+      const box = document.querySelector(`.fleet-box[data-ruta-id="${rutaIdGuardada}"]`);
+      if (box) {
+        const origen = {
+          lat: parseFloat(box.dataset.origenLat),
+          lng: parseFloat(box.dataset.origenLon)
+        };
+        const destino = {
+          lat: parseFloat(box.dataset.destinoLat),
+          lng: parseFloat(box.dataset.destinoLon)
+        };
+        map.setCenter(origen);
+        trazarRuta(origen, destino);
+        iniciarMonitoreoTiempoReal(rutaIdGuardada);
+        marcarTarjetaActiva(rutaIdGuardada);
+        alertify.success("✅ Origen registrado correctamente.");
       }
-
-      // ⏰ HORA SALIDA
-      const horaSalida = card.querySelector(".hora-salida");
-      if (horaSalida) {
-        horaSalida.innerHTML = ruta.hora_salida
-          ? `🕓 <strong>Salida:</strong> ${ruta.hora_salida}`
-          : `🕓 <strong>Salida:</strong> Aún no parte el vehículo`;
-      }
-
-      // 🕗 HORA LLEGADA
-      const horaLlegada = card.querySelector(".hora-llegada");
-      if (horaLlegada) {
-        horaLlegada.innerHTML = ruta.hora_llegada
-          ? `🕗 <strong>Llegada:</strong> ${ruta.hora_llegada}`
-          : `🕗 <strong>Llegada:</strong> No registrada`;
-      }
-
-      // ⏱ DURACIÓN
-      const duracion = card.querySelector(".duracion");
-      if (duracion) {
-        duracion.innerHTML = ruta.duracion
-          ? `⏱️ <strong>Duración:</strong> ${ruta.duracion}`
-          : `⏱️ <strong>Duración:</strong> No disponible`;
-      }
-    });
-  }
-
+    }
+  });
 </script>
 
 

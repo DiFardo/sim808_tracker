@@ -1,23 +1,13 @@
 from bd_conexion import obtener_conexion
+from datetime import date
 
-def registrar_ruta_y_asignacion(id_persona, id_vehiculo, destino_lat, destino_lon, destino, fecha):
+def registrar_ruta_solo_con_vehiculo(id_vehiculo, destino_lat, destino_lon, destino, fecha):
     conexion = obtener_conexion()
     try:
-        if not destino_lat or not destino_lon or not destino:
+        if not destino_lat or not destino_lon or not destino or not id_vehiculo or not fecha:
             return False, "Faltan campos requeridos", None
 
         with conexion.cursor() as cursor:
-            # Validar si ya existe una ruta para ese conductor en esa fecha
-            cursor.execute("""
-                SELECT 1
-                FROM rutas_programadas rp
-                JOIN asignacion_ruta_conductor arc ON rp.id = arc.id_ruta
-                WHERE arc.id_persona = %s AND rp.fecha = %s;
-            """, (id_persona, fecha))
-            
-            if cursor.fetchone():
-                return False, "El conductor ya tiene una ruta asignada en esta fecha.", None
-
             # Insertar nueva ruta
             cursor.execute("""
                 INSERT INTO rutas_programadas (
@@ -26,16 +16,16 @@ def registrar_ruta_y_asignacion(id_persona, id_vehiculo, destino_lat, destino_lo
                 VALUES (%s, %s, %s, %s)
                 RETURNING id;
             """, (destino, destino_lat, destino_lon, fecha))
-            
+
             id_ruta = cursor.fetchone()[0]
 
-            # Asignar ruta a conductor y vehículo
+            # Asignar vehículo a ruta (sin conductor por ahora)
             cursor.execute("""
-                INSERT INTO asignacion_ruta_conductor (id_persona, id_vehiculo, id_ruta)
-                VALUES (%s, %s, %s);
-            """, (id_persona, id_vehiculo, id_ruta))
+                INSERT INTO asignacion_ruta_conductor (id_ruta, id_vehiculo)
+                VALUES (%s, %s);
+            """, (id_ruta, id_vehiculo))
 
-            # Cambiar estado del vehículo
+            # Cambiar estado del vehículo a ocupado
             cursor.execute("UPDATE vehiculos SET estado = FALSE WHERE id = %s;", (id_vehiculo,))
 
         conexion.commit()
@@ -45,8 +35,107 @@ def registrar_ruta_y_asignacion(id_persona, id_vehiculo, destino_lat, destino_lo
         return False, str(e), None
     finally:
         conexion.close()
+        
+def asignar_conductor_a_ruta(id_ruta, id_persona):
+    conexion = obtener_conexion()
+    try:
+        with conexion.cursor() as cursor:
+            # Verificar si la ruta ya tiene conductor
+            cursor.execute("""
+                SELECT id_persona FROM asignacion_ruta_conductor WHERE id_ruta = %s
+            """, (id_ruta,))
+            resultado = cursor.fetchone()
+            if resultado and resultado[0]:
+                return False, "La ruta ya tiene un conductor asignado."
+
+            # Asignar conductor
+            cursor.execute("""
+                UPDATE asignacion_ruta_conductor
+                SET id_persona = %s
+                WHERE id_ruta = %s
+            """, (id_persona, id_ruta))
+
+        conexion.commit()
+        return True, "Conductor asignado correctamente"
+    except Exception as e:
+        conexion.rollback()
+        return False, str(e)
+    finally:
+        conexion.close()
+
+def editar_ruta_programada(id_ruta, id_vehiculo, destino_lat, destino_lon, destino, fecha):
+    conexion = obtener_conexion()
+    try:
+        if not destino_lat or not destino_lon or not destino or not id_vehiculo or not fecha or not id_ruta:
+            return False, "Faltan campos requeridos"
+
+        with conexion.cursor() as cursor:
+            # Obtener vehículo actual asignado
+            cursor.execute("""
+                SELECT id_vehiculo FROM asignacion_ruta_conductor WHERE id_ruta = %s;
+            """, (id_ruta,))
+            vehiculo_actual = cursor.fetchone()
+            vehiculo_actual = vehiculo_actual[0] if vehiculo_actual else None
+
+            # ✅ Siempre actualiza datos de la ruta
+            cursor.execute("""
+                UPDATE rutas_programadas
+                SET destino = %s, destino_lat = %s, destino_lon = %s, fecha = %s
+                WHERE id = %s;
+            """, (destino, destino_lat, destino_lon, fecha, id_ruta))
+
+            # ✅ Solo actualiza asignación de vehículo si cambia
+            if vehiculo_actual != int(id_vehiculo):
+                cursor.execute("""
+                    UPDATE asignacion_ruta_conductor
+                    SET id_vehiculo = %s
+                    WHERE id_ruta = %s;
+                """, (id_vehiculo, id_ruta))
+
+                # Cambiar estado de vehículos
+                if vehiculo_actual:
+                    cursor.execute("UPDATE vehiculos SET estado = TRUE WHERE id = %s;", (vehiculo_actual,))
+                cursor.execute("UPDATE vehiculos SET estado = FALSE WHERE id = %s;", (id_vehiculo,))
+
+        conexion.commit()
+        return True, "Ruta actualizada correctamente"
+    except Exception as e:
+        conexion.rollback()
+        return False, f"Error en SQL: {str(e)}"
+    finally:
+        conexion.close()
 
 
+
+
+def editar_conductor_de_ruta(id_ruta, nuevo_id_persona):
+    conexion = obtener_conexion()
+    try:
+        if not id_ruta or not nuevo_id_persona:
+            return False, "Faltan campos requeridos"
+
+        with conexion.cursor() as cursor:
+            # Obtener conductor anterior
+            cursor.execute("""
+                SELECT id_persona FROM asignacion_ruta_conductor WHERE id_ruta = %s;
+            """, (id_ruta,))
+            anterior = cursor.fetchone()
+            id_anterior = anterior[0] if anterior else None
+
+            # Actualizar al nuevo conductor
+            cursor.execute("""
+                UPDATE asignacion_ruta_conductor
+                SET id_persona = %s
+                WHERE id_ruta = %s;
+            """, (nuevo_id_persona, id_ruta))
+
+        conexion.commit()
+        return True, "Conductor actualizado correctamente"
+    except Exception as e:
+        conexion.rollback()
+        return False, str(e)
+    finally:
+        conexion.close()
 
 
 
@@ -149,13 +238,13 @@ def obtener_rutas_programadas():
                     rp.hora_llegada,
                     arc.id_persona,
                     arc.id_vehiculo,
-                    CONCAT(p.nombre, ' ', p.apellido) AS conductor,
+                    CONCAT(COALESCE(p.nombre, ''), ' ', COALESCE(p.apellido, '')) AS conductor,
                     CONCAT(v.modelo, ' - ', v.placa) AS vehiculo
                 FROM rutas_programadas rp
                 JOIN asignacion_ruta_conductor arc ON rp.id = arc.id_ruta
-                JOIN personas p ON arc.id_persona = p.id
+                LEFT JOIN personas p ON arc.id_persona = p.id
                 JOIN vehiculos v ON arc.id_vehiculo = v.id
-                ORDER BY rp.creado_en ASC;
+                ORDER BY rp.fecha ASC;
             """)
 
             for row in cursor.fetchall():
@@ -170,9 +259,9 @@ def obtener_rutas_programadas():
                     "fecha": row[7],
                     "hora_salida": row[8],
                     "hora_llegada": row[9],
-                    "id_persona": row[10],   # 👈 ahora disponibles
-                    "id_vehiculo": row[11],  # 👈 ahora disponibles
-                    "conductor": row[12],
+                    "id_persona": row[10],
+                    "id_vehiculo": row[11],
+                    "conductor": row[12].strip() if row[12] else "Sin asignar",
                     "vehiculo": row[13],
                     "duracion": calcular_duracion(row[8], row[9]) if row[9] else None
                 })
@@ -182,6 +271,56 @@ def obtener_rutas_programadas():
         conexion.close()
 
     return rutas
+
+def obtener_rutas_sin_conductor():
+    conexion = obtener_conexion()
+    try:
+        with conexion.cursor() as cursor:
+            cursor.execute("""
+                SELECT rp.id, rp.destino, rp.fecha
+                FROM rutas_programadas rp
+                LEFT JOIN asignacion_ruta_conductor arc ON rp.id = arc.id_ruta
+                WHERE arc.id_persona IS NULL
+                  AND rp.fecha >= %s
+                ORDER BY rp.fecha ASC;
+            """, (date.today(),))
+            columnas = [desc[0] for desc in cursor.description]
+            return [dict(zip(columnas, fila)) for fila in cursor.fetchall()]
+    except Exception as e:
+        print("Error al obtener rutas sin conductor:", e)
+        return []
+    finally:
+        conexion.close()
+
+def obtener_conductores_asignados():
+    conexion = obtener_conexion()
+    try:
+        with conexion.cursor() as cursor:
+            cursor.execute("""
+                SELECT 
+                    rp.id,                         -- ID de la ruta
+                    arc.id_persona,                -- ID del conductor
+                    arc.id_vehiculo,               -- ID del vehículo
+                    CONCAT(p.nombre, ' ', p.apellido) AS conductor,
+                    rp.destino,
+                    rp.destino_lat,
+                    rp.destino_lon,
+                    rp.fecha
+                FROM asignacion_ruta_conductor arc
+                JOIN personas p ON arc.id_persona = p.id
+                JOIN rutas_programadas rp ON arc.id_ruta = rp.id
+                WHERE arc.id_persona IS NOT NULL
+                ORDER BY rp.fecha DESC;
+            """)
+            columnas = [desc[0] for desc in cursor.description]
+            return [dict(zip(columnas, fila)) for fila in cursor.fetchall()]
+    except Exception as e:
+        print("Error al obtener conductores asignados:", e)
+        return []
+    finally:
+        conexion.close()
+
+
 
 
 def obtener_rutas_con_estado_envio():
@@ -239,9 +378,6 @@ def obtener_rutas_con_estado_envio():
         conexion.close()
 
     return rutas
-
-
-
 
 
 def calcular_duracion(hora_salida, hora_llegada):
@@ -328,3 +464,5 @@ def editar_ruta(id_ruta, id_persona, id_vehiculo, destino_lat, destino_lon, dest
         return False, str(e)
     finally:
         conexion.close()
+
+

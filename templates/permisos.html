@@ -11,45 +11,84 @@
 <link rel="stylesheet" href="//cdn.jsdelivr.net/npm/alertifyjs@1.13.1/build/css/alertify.min.css" />
 <link rel="stylesheet" href="//cdn.jsdelivr.net/npm/alertifyjs@1.13.1/build/css/themes/default.min.css" />
 <style>
-    .modulo {
-        margin-bottom: 20px;
-        border-bottom: 1px solid #ccc;
-        padding-bottom: 10px;
-    }
-    .opciones label {
-        display: block;
-        margin-left: 20px;
-        cursor: pointer;
-    }
-    .acciones label {
-        display: block;
-        margin-left: 40px;
-        cursor: pointer;
-    }
+  .modulo-card {
+    background-color: #f8f9fa;
+    border: 2px solid #dee2e6;
+    border-radius: 12px;
+    padding: 20px;
+    margin-bottom: 20px;
+    transition: box-shadow 0.2s ease-in-out;
+  }
+
+  .modulo-card:hover {
+    box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+  }
+
+  .modulo-card h5 {
+    font-size: 1.2rem;
+    font-weight: bold;
+    margin-bottom: 15px;
+    border-bottom: 1px solid #ccc;
+    padding-bottom: 5px;
+  }
+
+  .opciones label {
+    display: block;
+    margin-bottom: 8px;
+    font-weight: 500;
+  }
+
+  .form-check-input:checked {
+    background-color: #dc3545 !important;  /* rojo */
+    border-color: #dc3545 !important;
+  }
+
+  .form-check-input {
+    margin-right: 8px;
+    cursor: pointer;
+  }
 </style>
+
+
 {% endblock %}
 
 {% block contenido %}
 <div id="content">
-    <div class="main-content">
-        <h1>Asignar Permisos a Roles</h1>
+  <div class="main-content container py-4">
 
-        <label for="selectRol">Selecciona un Rol:</label>
-        <select id="selectRol" class="form-control mb-3">
-            <option value="">-- Elige un rol --</option>
-            <!-- Opciones se cargarán dinámicamente -->
+    <div class="card shadow-lg">
+      <div class="card-header  text-white text-center">
+        <h1 class="mb-0 fs-2 py-2">Asignación de Permisos a Roles</h1>
+      </div>
+      <div class="card-body">
+        <label for="selectRol" class="form-label fw-bold">Selecciona un Rol:</label>
+        <select id="selectRol" class="form-select mb-4">
+          <option value="">-- Elige un rol --</option>
         </select>
 
-        <form id="formPermisos" style="margin-top: 20px;">
-            <h2>Módulos y Opciones</h2>
-            <div id="listaModulos">
-                <!-- Módulos y opciones con checkboxes se cargarán aquí -->
-            </div>
+        <div id="cargandoPermisos" style="display:none;" class="text-center my-3">
+          <div class="spinner-border text-primary" role="status">
+            <span class="visually-hidden">Cargando...</span>
+          </div>
+          <p class="mt-2">Cargando permisos...</p>
+        </div>
 
-            <button type="submit" class="btn btn-primary mt-3">Guardar Permisos</button>
+        <form id="formPermisos">
+          <div class="row" id="listaModulos">
+            <!-- Se insertan dinámicamente los módulos -->
+          </div>
+
+          <div class="text-end mt-4">
+            <button type="submit" class="btn btn-success px-4 py-2 fw-bold">Guardar Permisos</button>
+          </div>
         </form>
+      </div>
     </div>
+
+  </div>
 </div>
+
+
 
 <script>
 document.addEventListener('DOMContentLoaded', () => {
@@ -107,24 +146,28 @@ function cargarModulosYOpciones() {
       contenedor.innerHTML = '';
 
       data.forEach(modulo => {
-        const divModulo = document.createElement('div');
-        divModulo.classList.add('modulo');
+        const col = document.createElement('div');
+        col.classList.add('col-md-6');
 
-        const moduloTitulo = document.createElement('h3');
-        moduloTitulo.innerHTML = `<input type="checkbox" class="modulo-check" data-modulo-id="${modulo.id}"> ${modulo.nombre}`;
-        divModulo.appendChild(moduloTitulo);
+        const card = document.createElement('div');
+        card.classList.add('modulo-card');
+
+        const titulo = document.createElement('h5');
+        titulo.innerHTML = `<input type="checkbox" class="form-check-input me-2 modulo-check" data-modulo-id="${modulo.id}"> ${modulo.nombre}`;
+        card.appendChild(titulo);
 
         const opcionesDiv = document.createElement('div');
         opcionesDiv.classList.add('opciones');
 
         modulo.opciones.forEach(opcion => {
-          const labelOpcion = document.createElement('label');
-          labelOpcion.innerHTML = `<input type="checkbox" class="opcion-check" data-opcion-id="${opcion.id}" data-modulo-id="${modulo.id}"> ${opcion.nombre}`;
-          opcionesDiv.appendChild(labelOpcion);
+          const label = document.createElement('label');
+          label.innerHTML = `<input type="checkbox" class="form-check-input me-2 opcion-check" data-opcion-id="${opcion.id}" data-modulo-id="${modulo.id}"> ${opcion.nombre}`;
+          opcionesDiv.appendChild(label);
         });
 
-        divModulo.appendChild(opcionesDiv);
-        contenedor.appendChild(divModulo);
+        card.appendChild(opcionesDiv);
+        col.appendChild(card);
+        contenedor.appendChild(col);
       });
     })
     .catch(err => {
@@ -133,7 +176,15 @@ function cargarModulosYOpciones() {
     });
 }
 
+
 function cargarPermisosRol(idRol) {
+  const spinner = document.getElementById('cargandoPermisos');
+  const listaModulos = document.getElementById('listaModulos');
+
+  // Mostrar spinner y ocultar lista
+  spinner.style.display = 'block';
+  listaModulos.style.display = 'none';
+
   fetch(`/api/permisos-rol/${idRol}`)
     .then(res => {
       if (!res.ok) throw new Error('Error al cargar permisos del rol');
@@ -143,7 +194,6 @@ function cargarPermisosRol(idRol) {
       limpiarPermisos();
 
       if (data.permisos_rol && Array.isArray(data.permisos_rol)) {
-
         const permisosPorModulo = {};
 
         data.permisos_rol.forEach(permiso => {
@@ -178,14 +228,19 @@ function cargarPermisosRol(idRol) {
             });
           }
         });
-
       }
     })
     .catch(err => {
       console.error(err);
       alert('No se pudieron cargar los permisos del rol.');
+    })
+    .finally(() => {
+      // Ocultar spinner y mostrar lista
+      spinner.style.display = 'none';
+      listaModulos.style.display = 'flex';
     });
 }
+
 
 
 
@@ -202,10 +257,8 @@ function guardarPermisos() {
         if (modCheck.checked) {
             permisos.push({ 
               tipo: 'modulo', 
-              id: modCheck.dataset.moduloId,
               id_modulo: modCheck.dataset.moduloId,
-              id_opcion: null,
-              id_accion: null
+              id_opcion: null
             });
         }
     });
@@ -214,25 +267,13 @@ function guardarPermisos() {
         if (opCheck.checked) {
             permisos.push({ 
               tipo: 'opcion', 
-              id: opCheck.dataset.opcionId,
               id_modulo: opCheck.dataset.moduloId,
-              id_opcion: opCheck.dataset.opcionId,
-              id_accion: null
+              id_opcion: opCheck.dataset.opcionId
             });
         }
     });
 
-    document.querySelectorAll('.accion-check').forEach(accCheck => {
-        if (accCheck.checked) {
-            permisos.push({ 
-              tipo: 'accion', 
-              id: accCheck.dataset.accionId,
-              id_modulo: accCheck.dataset.moduloId,
-              id_opcion: accCheck.dataset.opcionId,
-              id_accion: accCheck.dataset.accionId
-            });
-        }
-    });
+    console.log("📤 Enviando:", { id_rol: idRol, permisos }); // DEBUG opcional
 
     fetch('/api/guardar-permisos-rol', {
         method: 'POST',
@@ -251,6 +292,7 @@ function guardarPermisos() {
         alert('Error al guardar permisos.');
     });
 }
+
 
 // Control padre-hijo: marcar/desmarcar opciones cuando se marca un módulo
 document.addEventListener('change', function (e) {

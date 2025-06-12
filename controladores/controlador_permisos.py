@@ -6,18 +6,20 @@ import psycopg2.extras
 # PERMISOS_ROLES - CONTROLADORES
 # ======================
 
-def agregar_permiso_rol(id_rol, id_modulo, id_opcion=None, id_accion=None, permiso=True):
+def agregar_permiso_rol(id_rol, id_modulo, id_opcion=None, permiso=True):
     conexion = obtener_conexion()
     cursor = conexion.cursor()
     sql = """
-        INSERT INTO permisos_roles (id_rol, id_modulo, id_opcion, id_accion, permiso)
-        VALUES (%s, %s, %s, %s, %s)
-        ON CONFLICT (id_rol, id_modulo, id_opcion, id_accion) DO UPDATE SET permiso = EXCLUDED.permiso;
+        INSERT INTO permisos_roles (id_rol, id_modulo, id_opcion, permiso)
+        VALUES (%s, %s, %s, %s)
+        ON CONFLICT (id_rol, id_modulo, id_opcion)
+        DO UPDATE SET permiso = EXCLUDED.permiso;
     """
-    cursor.execute(sql, (id_rol, id_modulo, id_opcion, id_accion, permiso))
+    cursor.execute(sql, (id_rol, id_modulo, id_opcion, permiso))
     conexion.commit()
     cursor.close()
     conexion.close()
+
 
 def obtener_permisos_rol(id_rol):
     conexion = obtener_conexion()
@@ -39,6 +41,7 @@ def obtener_permisos_rol(id_rol):
     return resultados
 
 
+
 def es_superusuario(id_persona):
     # Esta función puede quedarse para validar si una persona es superusuario,
     # para permitirle administrar roles y permisos
@@ -56,6 +59,8 @@ def es_superusuario(id_persona):
 # ======================
 def guardar_permisos_rol():
     data = request.get_json()
+    print("📥 Datos recibidos:", data)  # DEBUG opcional
+
     id_rol = data.get('id_rol')
     permisos = data.get('permisos', [])
 
@@ -66,37 +71,38 @@ def guardar_permisos_rol():
     cursor = conexion.cursor()
 
     try:
+        # Eliminar permisos antiguos del rol
         cursor.execute("DELETE FROM permisos_roles WHERE id_rol = %s", (id_rol,))
 
         sql_insert = """
             INSERT INTO permisos_roles (id_rol, id_modulo, id_opcion, permiso)
             VALUES (%s, %s, %s, TRUE)
         """
+
         for permiso in permisos:
             tipo = permiso.get('tipo')
-            id_permiso = permiso.get('id')
-            id_modulo = None
-            id_opcion = None
+            id_modulo = permiso.get('id_modulo')
+            id_opcion = permiso.get('id_opcion')
 
-            if tipo == 'modulo':
-                id_modulo = id_permiso
-            elif tipo == 'opcion':
-                id_opcion = id_permiso
+            if tipo == 'modulo' and id_modulo:
+                cursor.execute(sql_insert, (id_rol, id_modulo, None))
+            elif tipo == 'opcion' and id_modulo and id_opcion:
+                cursor.execute(sql_insert, (id_rol, id_modulo, id_opcion))
             else:
-                continue
-
-            cursor.execute(sql_insert, (id_rol, id_modulo, id_opcion))
+                continue  # ignora otros tipos o datos incompletos
 
         conexion.commit()
     except Exception as e:
         conexion.rollback()
+        print("❌ Error al guardar permisos:", str(e))  # DEBUG opcional
+        return jsonify({'error': str(e)}), 500
+    finally:
         cursor.close()
         conexion.close()
-        return jsonify({'error': str(e)}), 500
 
-    cursor.close()
-    conexion.close()
     return jsonify({'message': 'Permisos guardados correctamente'})
+
+
 
 
 

@@ -65,7 +65,7 @@ def obtener_conductores_activos_con_asignacion():
                     END AS asignado
                 FROM personas p
                 LEFT JOIN asignacion_ruta_conductor arc ON p.id = arc.id_persona AND arc.estado = 'Activa'
-                WHERE p.estado = TRUE
+                WHERE p.estado = TRUE AND p.eliminado = FALSE
                 ORDER BY asignado DESC, p.nombre;
             """)
             resultados = cur.fetchall()
@@ -73,6 +73,7 @@ def obtener_conductores_activos_con_asignacion():
             return [dict(zip(columnas, fila)) for fila in resultados]
     finally:
         conn.close()
+
 
 
 def obtener_conductores_en_ruta():
@@ -83,13 +84,14 @@ def obtener_conductores_en_ruta():
                 SELECT DISTINCT p.id, p.nombre, p.apellido, p.dni
                 FROM asignacion_ruta_conductor arc
                 JOIN personas p ON arc.id_persona = p.id
-                WHERE arc.estado = 'Activa'
+                WHERE arc.estado = 'Activa' AND p.eliminado = FALSE
             """)
             resultados = cur.fetchall()
             columnas = [desc[0] for desc in cur.description]
             return [dict(zip(columnas, fila)) for fila in resultados]
     finally:
         conn.close()
+
 
 
 

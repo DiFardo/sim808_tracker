@@ -45,13 +45,14 @@ def obtener_todos_usuarios():
             FROM usuarios u
             JOIN personas p ON u.id_persona = p.id
             LEFT JOIN roles r ON p.id_rol = r.id
-            WHERE p.estado = TRUE
+            WHERE p.estado = TRUE AND p.eliminado = FALSE
             ORDER BY p.nombre, p.apellido
             """
         )
         usuarios = cursor.fetchall()
     conexion.close()
     return usuarios
+
 
 def obtener_roles_activos():
     conexion = obtener_conexion()
@@ -88,6 +89,7 @@ def obtener_usuarios_por_rol():
             FROM usuarios u
             JOIN personas p ON u.id_persona = p.id
             LEFT JOIN roles r ON p.id_rol = r.id
+            WHERE p.eliminado = FALSE
             ORDER BY r.nombre, p.apellido;
         """)
 
@@ -106,6 +108,7 @@ def obtener_usuarios_por_rol():
 
     conexion.close()
     return usuarios
+
 
 def obtener_usuario_por_id(id_usuario):
     conexion = obtener_conexion()
@@ -146,12 +149,12 @@ def agregar_usuario(nombre, apellido, dni, password, rol_id, estado=True):
 
     try:
         with conexion.cursor() as cursor:
-            # 1. Insertar en personas
+            # 1. Insertar en personas con eliminado = FALSE
             cursor.execute("""
-                INSERT INTO personas (nombre, apellido, dni, id_rol, estado)
-                VALUES (%s, %s, %s, %s, %s)
+                INSERT INTO personas (nombre, apellido, dni, id_rol, estado, eliminado)
+                VALUES (%s, %s, %s, %s, %s, %s)
                 RETURNING id;
-            """, (nombre, apellido, dni, rol_id, estado))
+            """, (nombre, apellido, dni, rol_id, estado, False))
             id_persona = cursor.fetchone()[0]
 
             # 2. Insertar en usuarios
@@ -172,6 +175,7 @@ def agregar_usuario(nombre, apellido, dni, password, rol_id, estado=True):
         conexion.close()
 
     return nuevo_id
+
 
 
 def editar_usuario(id_usuario, nombre, apellido, dni, rol_id, estado, password=None):
@@ -216,15 +220,26 @@ def eliminar_usuario(id_usuario):
     conexion = obtener_conexion()
     try:
         with conexion.cursor() as cursor:
-            # Eliminar primero de 'usuarios'
-            cursor.execute("DELETE FROM usuarios WHERE id = %s", (id_usuario,))
-        conexion.commit()
-        return True
+            # Primero obtenemos el id_persona asociado al usuario
+            cursor.execute("SELECT id_persona FROM usuarios WHERE id = %s", (id_usuario,))
+            resultado = cursor.fetchone()
+
+            if resultado:
+                id_persona = resultado[0]
+                # Marcar persona como eliminada
+                cursor.execute("UPDATE personas SET eliminado = TRUE WHERE id = %s", (id_persona,))
+                # Eliminar de usuarios (opcional si ya no lo necesitas en esa tabla)
+                cursor.execute("DELETE FROM usuarios WHERE id = %s", (id_usuario,))
+                conexion.commit()
+                return True
+            else:
+                return False
     except Exception as e:
         conexion.rollback()
         raise e
     finally:
         conexion.close()
+
 
 
 def actualizar_estado_usuario(id_usuario, nuevo_estado):

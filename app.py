@@ -41,23 +41,17 @@ app.config['JWT_COOKIE_CSRF_PROTECT'] = False  # Pon True si usarás CSRF con co
 app.url_map.strict_slashes = False
 
 
-logging.basicConfig(level=logging.DEBUG)
-
-@app.before_request
-def log_request_info():
-    app.logger.debug(f"Request path: {request.path}")
-    app.logger.debug(f"Method: {request.method}")
-    app.logger.debug(f"Headers: {request.headers}")
-    app.logger.debug(f"Body: {request.get_data()}")
 
 
-def tiene_permiso(permisos, id_modulo=None, id_opcion=None, id_accion=None):
-      for p in permisos:
+
+
+def tiene_permiso(permisos, id_modulo=None, id_opcion=None):
+    for p in permisos:
         if ((id_modulo is None or p[0] == id_modulo) and
             (id_opcion is None or p[2] == id_opcion) and
-            p[4] == True):
+            p[4] == True):  # p[4] representa el campo 'permiso'
             return True
-        return False
+    return False
 
 
 
@@ -177,11 +171,22 @@ def api_permisos_rol(id_rol):
     if not usuario_actual or not usuario_actual.get('superusuario', False):
         return jsonify({"error": "Acceso denegado"}), 403
 
-    permisos_rol = controlador_permisos.obtener_permisos_rol(id_rol)
+    resultados = controlador_permisos.obtener_permisos_rol(id_rol)
+
+    permisos_rol = []
+    for fila in resultados:
+        permisos_rol.append({
+            "id_modulo": fila[0],
+            "modulo_nombre": fila[1],
+            "id_opcion": fila[2],  # Puede ser None
+            "opcion_nombre": fila[3],  # Puede ser None
+            "permiso": fila[4]
+        })
 
     return jsonify({
         "permisos_rol": permisos_rol
     })
+
 
 @app.route("/api/guardar-permisos-rol", methods=["POST"])
 @jwt_required()
@@ -449,7 +454,118 @@ def rutas_programadas():
                            conductores=conductores,
                            vehiculos=vehiculos)
 
+@app.route("/gestionar_rutas")
+@jwt_required()
+def gestionar_rutas():
+    dni_usuario = get_jwt_identity()
+    usuario = controlador_usuarios.obtener_usuario(dni_usuario)
+    rutas = controlador_rutas.obtener_rutas_programadas()
+    rutas_sin_conductor = controlador_rutas.obtener_rutas_sin_conductor()
+    conductores = controlador_rutas.obtener_todos_los_conductores()
+    vehiculos = controlador_rutas.obtener_todos_los_vehiculos_con_estado()
+    asignaciones = controlador_rutas.obtener_conductores_asignados()  #
 
+    breadcrumbs = [
+        {"name": "Inicio", "url": "/"},
+        {"name": "Rutas Programadas", "url": "/rutas_programadas"}
+    ]
+
+    return render_template("gestionar_rutas.html",
+                           usuario=usuario,
+                           breadcrumbs=breadcrumbs,
+                           rutas_programadas=rutas,
+                           rutas_sin_conductor=rutas_sin_conductor,
+                           conductores=conductores,
+                           vehiculos=vehiculos,
+                            asignaciones=asignaciones)
+    
+
+@app.route("/api/asignar_conductor", methods=["POST"])
+@jwt_required()
+def api_asignar_conductor():
+    try:
+        data = request.form
+        id_ruta = int(data.get("ruta_id"))
+        id_persona = int(data.get("conductor_id"))
+
+        if not id_ruta or not id_persona:
+            return jsonify({"success": False, "message": "Faltan datos obligatorios"}), 400
+
+        success, msg = controlador_rutas.asignar_conductor_a_ruta(id_ruta, id_persona)
+        if success:
+            return jsonify({"success": True, "message": msg})
+        else:
+            return jsonify({"success": False, "message": msg}), 400
+
+    except Exception as e:
+        return jsonify({"success": False, "message": f"Error: {str(e)}"}), 500
+
+@app.route("/api/editar_ruta", methods=["PUT"])
+@jwt_required()
+def api_editar_ruta():
+    try:
+        data = request.form or request.json
+        id_ruta = int(data.get("ruta_id"))
+        id_vehiculo = int(data.get("vehiculo"))
+        destino = data.get("destino")
+        destino_coords = data.get("destino_coords")
+        fecha = data.get("fecha")
+
+        if not all([id_ruta, id_vehiculo, destino, destino_coords, fecha]):
+            return jsonify({"success": False, "message": "Faltan datos obligatorios"}), 400
+
+        lat, lon = map(str.strip, destino_coords.split(","))
+
+        success, msg = controlador_rutas.editar_ruta_programada(
+            id_ruta=id_ruta,
+            id_vehiculo=id_vehiculo,
+            destino_lat=lat,
+            destino_lon=lon,
+            destino=destino,
+            fecha=fecha
+        )
+
+        if success:
+            vehiculo = controlador_rutas.obtener_vehiculo_por_id(id_vehiculo)
+            return jsonify({
+                "success": True,
+                "message": msg,
+                "ruta": {
+                    "id": id_ruta,
+                    "destino": destino,
+                    "fecha": fecha,
+                    "lat": lat,
+                    "lon": lon,
+                    "vehiculo": f"{vehiculo['modelo']} - {vehiculo['placa']}" if vehiculo else "N/D",
+                    "vehiculo_id": id_vehiculo
+                }
+            }), 200
+        else:
+            return jsonify({"success": False, "message": msg}), 400
+
+    except Exception as e:
+        return jsonify({"success": False, "message": f"Error: {str(e)}"}), 500
+
+
+@app.route("/api/editar_conductor", methods=["PUT"])
+@jwt_required()
+def api_editar_conductor():
+    try:
+        data = request.form or request.json
+        id_ruta = int(data.get("ruta_id"))
+        id_persona = int(data.get("conductor_id"))
+
+        if not id_ruta or not id_persona:
+            return jsonify({"success": False, "message": "Faltan datos obligatorios"}), 400
+
+        success, msg = controlador_rutas.editar_conductor_de_ruta(id_ruta, id_persona)
+        if success:
+            return jsonify({"success": True, "message": msg})
+        else:
+            return jsonify({"success": False, "message": msg}), 400
+
+    except Exception as e:
+        return jsonify({"success": False, "message": f"Error: {str(e)}"}), 500
 
 
 @app.route("/api/ubicacion_actual")
@@ -471,20 +587,18 @@ def ubicacion_actual():
     finally:
         conn.close()
 
-
 @app.route("/api/asignar_ruta", methods=["POST"])
 @jwt_required()
 def api_asignar_ruta():
     try:
         data = request.form
 
-        id_persona = int(data.get("conductor"))
         id_vehiculo = int(data.get("vehiculo"))
         destino_completo = data.get("destino")
         destino_coords = data.get("destino_coords")
-        fecha = data.get("fecha")
+        fecha = date.today().isoformat()  # <-- Forzamos la fecha actual del sistema
 
-        if not all([id_persona, id_vehiculo, destino_completo, destino_coords, fecha]):
+        if not all([id_vehiculo, destino_completo, destino_coords]):
             return jsonify({"success": False, "message": "Faltan campos requeridos"}), 400
 
         try:
@@ -494,22 +608,65 @@ def api_asignar_ruta():
 
         destino = destino_completo
 
-        success, msg, _ = controlador_rutas.registrar_ruta_y_asignacion(
-            id_persona=id_persona,
+        success, msg, id_ruta = controlador_rutas.registrar_ruta_solo_con_vehiculo(
             id_vehiculo=id_vehiculo,
             destino=destino,
             destino_lat=destino_lat,
             destino_lon=destino_lon,
-            fecha=fecha
+            fecha=fecha  # <-- Fecha actual
         )
 
         if success:
-            return jsonify({"success": True, "message": "Ruta asignada correctamente"}), 200
+            vehiculo = controlador_rutas.obtener_vehiculo_por_id(id_vehiculo)
+            return jsonify({
+                "success": True,
+                "message": msg,
+                "ruta": {
+                    "id": id_ruta,
+                    "destino": destino,
+                    "fecha": fecha,
+                    "lat": destino_lat,
+                    "lon": destino_lon,
+                    "vehiculo": f"{vehiculo['modelo']} - {vehiculo['placa']}" if vehiculo else "N/D",
+                    "vehiculo_id": id_vehiculo
+                }
+            }), 200
         else:
             return jsonify({"success": False, "message": msg}), 500
 
     except Exception as e:
-        return jsonify({"success": False, "message": f"Error: {str(e)}"}), 500
+        return jsonify({"success": False, "message": str(e)}), 500
+
+@app.route("/api/vehiculos_disponibles")
+def vehiculos_disponibles():
+    id_asignado = request.args.get("id_asignado", type=int)
+    vehiculos = controlador_rutas.obtener_vehiculos_disponibles(id_asignado)
+    return jsonify(vehiculos)
+
+@app.route("/api/registrar_desvio", methods=["POST"])
+def registrar_desvio():
+    try:
+        data = request.get_json()
+        id_ruta = int(data["id_ruta"])
+        lat = float(data["lat"])
+        lon = float(data["lon"])
+
+        conexion = obtener_conexion()
+        cursor = conexion.cursor()
+        cursor.execute("""
+            INSERT INTO desvio_ruta (id_ruta, latitud, longitud)
+            VALUES (%s, %s, %s)
+        """, (id_ruta, lat, lon))
+        conexion.commit()
+        cursor.close()
+        conexion.close()
+
+        return jsonify({"success": True})
+    except Exception as e:
+        print("❌ Error al registrar desvío:", e)
+        return jsonify({"success": False, "message": str(e)}), 500
+
+
     
 @app.route("/api/ruta/<int:id_ruta>", methods=["DELETE"])
 @jwt_required()
@@ -522,45 +679,47 @@ def eliminar_ruta_api(id_ruta):
             return jsonify({"success": False, "message": msg}), 500
     except Exception as e:
         return jsonify({"success": False, "message": str(e)}), 500
+    
 
 
-@app.route("/api/ruta/<int:id_ruta>", methods=["PUT"])
-@jwt_required()
-def editar_ruta_api(id_ruta):
-    try:
-        data = request.form
 
-        id_persona = int(data.get("conductor"))
-        id_vehiculo = int(data.get("vehiculo"))
-        destino = data.get("destino")
-        destino_coords = data.get("destino_coords")
-        fecha = data.get("fecha")
+# @app.route("/api/ruta/<int:id_ruta>", methods=["PUT"])
+# @jwt_required()
+# def editar_ruta_api(id_ruta):
+#     try:
+#         data = request.form
 
-        if not all([id_persona, id_vehiculo, destino, destino_coords, fecha]):
-            return jsonify({"success": False, "message": "Faltan campos requeridos"}), 400
+#         id_persona = int(data.get("conductor"))
+#         id_vehiculo = int(data.get("vehiculo"))
+#         destino = data.get("destino")
+#         destino_coords = data.get("destino_coords")
+#         fecha = data.get("fecha")
 
-        try:
-            destino_lat, destino_lon = map(float, destino_coords.split(","))
-        except ValueError:
-            return jsonify({"success": False, "message": "Coordenadas inválidas"}), 400
+#         if not all([id_persona, id_vehiculo, destino, destino_coords, fecha]):
+#             return jsonify({"success": False, "message": "Faltan campos requeridos"}), 400
 
-        success, msg = controlador_rutas.editar_ruta(
-            id_ruta=id_ruta,
-            id_persona=id_persona,
-            id_vehiculo=id_vehiculo,
-            destino=destino,
-            destino_lat=destino_lat,
-            destino_lon=destino_lon,
-            fecha=fecha
-        )
+#         try:
+#             destino_lat, destino_lon = map(float, destino_coords.split(","))
+#         except ValueError:
+#             return jsonify({"success": False, "message": "Coordenadas inválidas"}), 400
 
-        if success:
-            return jsonify({"success": True, "message": msg}), 200
-        else:
-            return jsonify({"success": False, "message": msg}), 500
+#         success, msg = controlador_rutas.editar_ruta(
+#             id_ruta=id_ruta,
+#             id_persona=id_persona,
+#             id_vehiculo=id_vehiculo,
+#             destino=destino,
+#             destino_lat=destino_lat,
+#             destino_lon=destino_lon,
+#             fecha=fecha
+#         )
 
-    except Exception as e:
-        return jsonify({"success": False, "message": str(e)}), 500
+#         if success:
+#             return jsonify({"success": True, "message": msg}), 200
+#         else:
+#             return jsonify({"success": False, "message": msg}), 500
+
+#     except Exception as e:
+#         return jsonify({"success": False, "message": str(e)}), 500
 
 ## APIS PARA REPUESTAS DEL MODULO SIM 808 
 
@@ -623,9 +782,35 @@ def marcar_ruta_activa():
     finally:
         conexion.close()
 
+@app.route("/api/estado-ruta/<int:id_ruta>", methods=["GET"])
+def verificar_estado_ruta(id_ruta):
+    try:
+        conexion = obtener_conexion()
+        with conexion.cursor() as cursor:
+            cursor.execute("""
+                SELECT estado
+                FROM asignacion_ruta_conductor
+                WHERE id_ruta = %s;
+            """, (id_ruta,))
+            
+            resultado = cursor.fetchone()
 
+            if resultado is None:
+                return jsonify({"success": False, "message": "Ruta no encontrada"}), 404
 
+            estado = resultado[0]
 
+            if estado == 'finalizado':
+                return jsonify({"success": True, "estado": "finalizado"}), 200
+            else:
+                return jsonify({"success": True, "estado": estado}), 200
+
+    except Exception as e:
+        print("❌ Error al verificar estado de ruta:", str(e))
+        return jsonify({"success": False, "message": str(e)}), 500
+
+    finally:
+        conexion.close()
 
 
 def obtener_direccion_desde_coordenadas(lat, lon):
@@ -834,7 +1019,11 @@ def estado_ruta(id_ruta):
 
 @app.route("/api/ultima_ubicacion", methods=["GET"])
 def obtener_ultima_ubicacion():
-    id_ruta = request.args.get("id_ruta")
+    try:
+        id_ruta = int(request.args.get("id_ruta"))
+    except (ValueError, TypeError):
+        return jsonify({"success": False, "message": "id_ruta inválido"}), 400
+
     conexion = obtener_conexion()
     try:
         with conexion.cursor() as cursor:
@@ -842,7 +1031,7 @@ def obtener_ultima_ubicacion():
                 SELECT lat, lon
                 FROM ubicaciones_ruta
                 WHERE id_ruta = %s
-                ORDER BY registrado_en DESC
+                ORDER BY hora DESC
                 LIMIT 1;
             """, (id_ruta,))
             resultado = cursor.fetchone()
@@ -855,9 +1044,11 @@ def obtener_ultima_ubicacion():
             else:
                 return jsonify({"success": False, "message": "No hay ubicaciones"}), 404
     except Exception as e:
+        print("❌ Error al obtener ubicación:", e)
         return jsonify({"success": False, "message": str(e)}), 500
     finally:
         conexion.close()
+
 
 
 
