@@ -13,6 +13,7 @@
     background: #f1f5f9;
     font-family: 'Inter', sans-serif;
   }
+
   .dashboard-card {
     border-radius: 1rem;
     background: #fff;
@@ -20,10 +21,12 @@
     height: 100%;
     box-shadow: 0 4px 16px rgba(0, 0, 0, 0.06);
   }
+
   .dashboard-card:hover {
     transform: translateY(-4px);
     box-shadow: 0 12px 24px rgba(0, 0, 0, 0.1);
   }
+
   .icon-circle {
     width: 64px;
     height: 64px;
@@ -33,36 +36,44 @@
     align-items: center;
     justify-content: center;
   }
+
   .icon-circle i {
     color: white;
     width: 28px;
     height: 28px;
   }
+
   .card-title {
     font-weight: 600;
     color: #1f2937;
   }
+
   .badge {
     font-size: 0.9rem;
     padding: 0.5em 0.75em;
     border-radius: 12px;
   }
+
   .scrollable {
     max-height: 320px;
     overflow-y: auto;
   }
+
   @media (max-width: 767.98px) {
     .dashboard-card {
       padding: 1rem !important;
       text-align: center;
     }
-    .row.g-4 > div {
+
+    .row.g-4>div {
       flex: 0 0 100%;
       max-width: 100%;
     }
+
     .icon-circle {
       margin: 0 auto;
     }
+
     h2.fw-bold {
       font-size: 1.75rem;
     }
@@ -92,43 +103,49 @@
         </div>
 
         <div class="col-md-4">
-          <div class="card dashboard-card p-4">
-            <h6 class="card-title">Rutas Programadas Hoy</h6>
-            <div class="scrollable">
-              {% if rutas_hoy|length == 0 %}
+          <a href="{{ url_for('gestionar_rutas') }}" class="text-decoration-none text-dark">
+            <div class="card dashboard-card p-4">
+              <h6 class="card-title">Rutas Programadas Hoy</h6>
+              <div class="scrollable">
+                {% if rutas_hoy|length == 0 %}
                 <p class="text-muted">No hay rutas programadas.</p>
-              {% else %}
+                {% else %}
                 <ul class="list-group list-group-flush">
                   {% for ruta in rutas_hoy %}
-                    <li class="list-group-item">
-                      <strong>{{ ruta.conductor }}</strong>: {{ ruta.origen }} &rarr; {{ ruta.destino }}
-                    </li>
+                  <li class="list-group-item">
+                    <strong>{{ ruta.conductor }}</strong>: {{ ruta.origen }} &rarr; {{ ruta.destino }}
+                  </li>
                   {% endfor %}
                 </ul>
-              {% endif %}
+                {% endif %}
+              </div>
             </div>
-          </div>
+          </a>
         </div>
 
+
         <div class="col-md-4">
-          <div class="card dashboard-card p-4">
-            <h6 class="card-title">Vehículos en Ruta</h6>
-            <div class="scrollable">
-              {% if vehiculos_en_ruta|length == 0 %}
+          <a href="{{ url_for('mapa_flotas') }}" class="text-decoration-none text-dark">
+            <div class="card dashboard-card p-4">
+              <h6 class="card-title">Vehículos en Ruta</h6>
+              <div class="scrollable">
+                {% if vehiculos_en_ruta|length == 0 %}
                 <p class="text-muted">No hay vehículos en ruta.</p>
-              {% else %}
+                {% else %}
                 <ul class="list-group list-group-flush">
                   {% for vehiculo in vehiculos_en_ruta %}
-                    <li class="list-group-item d-flex justify-content-between">
-                      {{ vehiculo.placa }}
-                      <span class="badge bg-primary">{{ vehiculo.cantidad_asignada }}</span>
-                    </li>
+                  <li class="list-group-item d-flex justify-content-between">
+                    {{ vehiculo.placa }}
+                    <span class="badge bg-primary">{{ vehiculo.cantidad_asignada }}</span>
+                  </li>
                   {% endfor %}
                 </ul>
-              {% endif %}
+                {% endif %}
+              </div>
             </div>
-          </div>
+          </a>
         </div>
+
       </div>
 
       <div class="row g-4 mt-4">
@@ -139,7 +156,7 @@
               <canvas id="chart-rutas-dias"></canvas>
               <ul class="mt-3">
                 {% for dia in dias_top_rutas %}
-                  <li><strong>{{ dia.fecha.strftime('%d %b %Y') }}</strong>: {{ dia.total_rutas }} rutas</li>
+                <li><strong>{{ dia.fecha.strftime('%d %b %Y') }}</strong>: {{ dia.total_rutas }} rutas</li>
                 {% endfor %}
               </ul>
             </div>
@@ -151,20 +168,20 @@
             <h6 class="card-title">Conductores Disponibles</h6>
             <div class="scrollable">
               {% if conductores_disponibles|length == 0 %}
-                <p class="text-muted">No hay conductores disponibles.</p>
+              <p class="text-muted">No hay conductores disponibles.</p>
               {% else %}
-                <ul class="list-group list-group-flush">
-                  {% for conductor in conductores_disponibles %}
-                    <li class="list-group-item d-flex justify-content-between">
-                      {{ conductor.nombre }} {{ conductor.apellido }}
-                      {% if conductor.asignado %}
-                        <span class="badge bg-danger">Asignado</span>
-                      {% else %}
-                        <span class="badge bg-success">Disponible</span>
-                      {% endif %}
-                    </li>
-                  {% endfor %}
-                </ul>
+              <ul class="list-group list-group-flush">
+                {% for conductor in conductores_disponibles %}
+                <li class="list-group-item d-flex justify-content-between">
+                  {{ conductor.nombre }} {{ conductor.apellido }}
+                  {% if conductor.asignado %}
+                  <span class="badge bg-danger">Asignado</span>
+                  {% else %}
+                  <span class="badge bg-success">Disponible</span>
+                  {% endif %}
+                </li>
+                {% endfor %}
+              </ul>
               {% endif %}
             </div>
           </div>
@@ -186,22 +203,22 @@
     const chart = new Chart(ctx, {
       type: 'doughnut',
       data: {
-        labels: [{% for dia in dias_top_rutas %}'{{ dia.fecha.strftime('%d %b') }}'{% if not loop.last %}, {% endif %}{% endfor %}],
-        datasets: [{
-          data: [{% for dia in dias_top_rutas %}{{ dia.total_rutas }}{% if not loop.last %}, {% endif %}{% endfor %}],
-          backgroundColor: ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#6366f1'],
-          hoverOffset: 10
+        labels: [{% for dia in dias_top_rutas %}'{{ dia.fecha.strftime('% d % b') }}'{% if not loop.last %}, {% endif %}{% endfor %}],
+    datasets: [{
+      data: [{% for dia in dias_top_rutas %}{{ dia.total_rutas }}{% if not loop.last %}, {% endif %} {% endfor %}],
+  backgroundColor: ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#6366f1'],
+    hoverOffset: 10
         }]
       },
-      options: {
-        responsive: true,
-        plugins: {
-          legend: {
-            position: 'bottom',
-            labels: { color: '#374151' }
-          }
-        }
+  options: {
+    responsive: true,
+      plugins: {
+      legend: {
+        position: 'bottom',
+          labels: { color: '#374151' }
       }
+    }
+  }
     });
   });
 </script>

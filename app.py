@@ -322,7 +322,7 @@ def vehiculos():
     usuario = controlador_usuarios.obtener_usuario(dni_usuario)
     vehiculos = obtener_vehiculos()
     breadcrumbs = [
-        {"name": "Inicio", "url": "/"},
+        {"name": "Inicio", "url": "/index"},
         {"name": "Vehículos", "url": "/vehiculos"}
     ]
     return render_template("vehiculos.html", usuario=usuario, vehiculos=vehiculos, breadcrumbs=breadcrumbs)
@@ -422,7 +422,7 @@ def mapa_flotas():
     rutas_hoy = [r for r in rutas if r["fecha"] == hoy]
 
     breadcrumbs = [
-        {"name": "Inicio", "url": "/"},
+        {"name": "Inicio", "url": "/index"},
         {"name": "Mapa", "url": "/mapa_flotas"}
     ]
     return render_template(
@@ -434,25 +434,7 @@ def mapa_flotas():
 
 
 
-@app.route("/rutas_programadas")
-@jwt_required()
-def rutas_programadas():
-    dni_usuario = get_jwt_identity()
-    usuario = controlador_usuarios.obtener_usuario(dni_usuario)
-    rutas = controlador_rutas.obtener_rutas_programadas()
-    conductores = controlador_rutas.obtener_todos_los_conductores()
-    vehiculos = controlador_rutas.obtener_todos_los_vehiculos_con_estado()
 
-    breadcrumbs = [
-        {"name": "Inicio", "url": "/"},
-        {"name": "Rutas Programadas", "url": "/rutas_programadas"}
-    ]
-    return render_template("rutas_programadas.html",
-                           usuario=usuario,
-                           breadcrumbs=breadcrumbs,
-                           rutas=rutas,
-                           conductores=conductores,
-                           vehiculos=vehiculos)
 
 @app.route("/gestionar_rutas")
 @jwt_required()
@@ -466,7 +448,7 @@ def gestionar_rutas():
     asignaciones = controlador_rutas.obtener_conductores_asignados()  #
 
     breadcrumbs = [
-        {"name": "Inicio", "url": "/"},
+        {"name": "Inicio", "url": "/index"},
         {"name": "Rutas Programadas", "url": "/rutas_programadas"}
     ]
 

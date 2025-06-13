@@ -39,7 +39,8 @@
   }
 
   .form-check-input:checked {
-    background-color: #dc3545 !important;  /* rojo */
+    background-color: #dc3545 !important;
+    /* rojo */
     border-color: #dc3545 !important;
   }
 
@@ -55,6 +56,17 @@
 {% block contenido %}
 <div id="content">
   <div class="main-content container py-4">
+    <nav aria-label="breadcrumb" class="mb-3">
+      <ol class="breadcrumb">
+        {% for crumb in breadcrumbs %}
+        {% if loop.last %}
+        <li class="breadcrumb-item active" aria-current="page">{{ crumb.name }}</li>
+        {% else %}
+        <li class="breadcrumb-item"><a href="{{ crumb.url }}">{{ crumb.name }}</a></li>
+        {% endif %}
+        {% endfor %}
+      </ol>
+    </nav>
 
     <div class="card shadow-lg">
       <div class="card-header  text-white text-center">
@@ -91,227 +103,227 @@
 
 
 <script>
-document.addEventListener('DOMContentLoaded', () => {
+  document.addEventListener('DOMContentLoaded', () => {
     cargarRoles();
     cargarModulosYOpciones();
 
     document.getElementById('selectRol').addEventListener('change', function () {
-        const idRol = this.value;
-        if (!idRol) {
-            limpiarPermisos();
-            return;
-        }
-        cargarPermisosRol(idRol);
+      const idRol = this.value;
+      if (!idRol) {
+        limpiarPermisos();
+        return;
+      }
+      cargarPermisosRol(idRol);
     });
 
     document.getElementById('formPermisos').addEventListener('submit', function (e) {
-        e.preventDefault();
-        guardarPermisos();
+      e.preventDefault();
+      guardarPermisos();
     });
-});
+  });
 
-function limpiarPermisos() {
+  function limpiarPermisos() {
     document.querySelectorAll('#listaModulos input[type=checkbox]').forEach(chk => chk.checked = false);
-}
+  }
 
-function cargarRoles() {
+  function cargarRoles() {
     fetch('/api/roles')
-        .then(res => {
-            if (!res.ok) throw new Error('Error al cargar roles');
-            return res.json();
-        })
-        .then(data => {
-            const select = document.getElementById('selectRol');
-            select.innerHTML = '<option value="">-- Elige un rol --</option>';
-            data.forEach(rol => {
-                const option = document.createElement('option');
-                option.value = rol.id;
-                option.textContent = rol.nombre;
-                select.appendChild(option);
-            });
-        })
-        .catch(err => {
-            console.error(err);
-            alert('No se pudieron cargar los roles.');
+      .then(res => {
+        if (!res.ok) throw new Error('Error al cargar roles');
+        return res.json();
+      })
+      .then(data => {
+        const select = document.getElementById('selectRol');
+        select.innerHTML = '<option value="">-- Elige un rol --</option>';
+        data.forEach(rol => {
+          const option = document.createElement('option');
+          option.value = rol.id;
+          option.textContent = rol.nombre;
+          select.appendChild(option);
         });
-}
-function cargarModulosYOpciones() {
-  fetch('/api/modulos-opciones')
-    .then(res => {
-      if (!res.ok) throw new Error('Error al cargar módulos y opciones');
-      return res.json();
-    })
-    .then(data => {
-      const contenedor = document.getElementById('listaModulos');
-      contenedor.innerHTML = '';
-
-      data.forEach(modulo => {
-        const col = document.createElement('div');
-        col.classList.add('col-md-6');
-
-        const card = document.createElement('div');
-        card.classList.add('modulo-card');
-
-        const titulo = document.createElement('h5');
-        titulo.innerHTML = `<input type="checkbox" class="form-check-input me-2 modulo-check" data-modulo-id="${modulo.id}"> ${modulo.nombre}`;
-        card.appendChild(titulo);
-
-        const opcionesDiv = document.createElement('div');
-        opcionesDiv.classList.add('opciones');
-
-        modulo.opciones.forEach(opcion => {
-          const label = document.createElement('label');
-          label.innerHTML = `<input type="checkbox" class="form-check-input me-2 opcion-check" data-opcion-id="${opcion.id}" data-modulo-id="${modulo.id}"> ${opcion.nombre}`;
-          opcionesDiv.appendChild(label);
-        });
-
-        card.appendChild(opcionesDiv);
-        col.appendChild(card);
-        contenedor.appendChild(col);
+      })
+      .catch(err => {
+        console.error(err);
+        alert('No se pudieron cargar los roles.');
       });
-    })
-    .catch(err => {
-      console.error(err);
-      alert('No se pudieron cargar los módulos y opciones.');
-    });
-}
+  }
+  function cargarModulosYOpciones() {
+    fetch('/api/modulos-opciones')
+      .then(res => {
+        if (!res.ok) throw new Error('Error al cargar módulos y opciones');
+        return res.json();
+      })
+      .then(data => {
+        const contenedor = document.getElementById('listaModulos');
+        contenedor.innerHTML = '';
 
+        data.forEach(modulo => {
+          const col = document.createElement('div');
+          col.classList.add('col-md-6');
 
-function cargarPermisosRol(idRol) {
-  const spinner = document.getElementById('cargandoPermisos');
-  const listaModulos = document.getElementById('listaModulos');
+          const card = document.createElement('div');
+          card.classList.add('modulo-card');
 
-  // Mostrar spinner y ocultar lista
-  spinner.style.display = 'block';
-  listaModulos.style.display = 'none';
+          const titulo = document.createElement('h5');
+          titulo.innerHTML = `<input type="checkbox" class="form-check-input me-2 modulo-check" data-modulo-id="${modulo.id}"> ${modulo.nombre}`;
+          card.appendChild(titulo);
 
-  fetch(`/api/permisos-rol/${idRol}`)
-    .then(res => {
-      if (!res.ok) throw new Error('Error al cargar permisos del rol');
-      return res.json();
-    })
-    .then(data => {
-      limpiarPermisos();
+          const opcionesDiv = document.createElement('div');
+          opcionesDiv.classList.add('opciones');
 
-      if (data.permisos_rol && Array.isArray(data.permisos_rol)) {
-        const permisosPorModulo = {};
+          modulo.opciones.forEach(opcion => {
+            const label = document.createElement('label');
+            label.innerHTML = `<input type="checkbox" class="form-check-input me-2 opcion-check" data-opcion-id="${opcion.id}" data-modulo-id="${modulo.id}"> ${opcion.nombre}`;
+            opcionesDiv.appendChild(label);
+          });
 
-        data.permisos_rol.forEach(permiso => {
-          if (!permiso.permiso) return;
-
-          const mid = permiso.id_modulo;
-          if (!permisosPorModulo[mid]) {
-            permisosPorModulo[mid] = {
-              general: false,
-              opciones: new Set()
-            };
-          }
-
-          if (!permiso.id_opcion) {
-            permisosPorModulo[mid].general = true;
-          } else {
-            permisosPorModulo[mid].opciones.add(permiso.id_opcion);
-          }
+          card.appendChild(opcionesDiv);
+          col.appendChild(card);
+          contenedor.appendChild(col);
         });
-
-        Object.entries(permisosPorModulo).forEach(([mid, permisos]) => {
-          const modChk = document.querySelector(`.modulo-check[data-modulo-id="${mid}"]`);
-          if (!modChk) return;
-
-          if (permisos.general) {
-            modChk.checked = true;
-            document.querySelectorAll(`.opcion-check[data-modulo-id="${mid}"]`).forEach(op => op.checked = true);
-          } else {
-            permisos.opciones.forEach(oid => {
-              const opChk = document.querySelector(`.opcion-check[data-opcion-id="${oid}"]`);
-              if (opChk) opChk.checked = true;
-            });
-          }
-        });
-      }
-    })
-    .catch(err => {
-      console.error(err);
-      alert('No se pudieron cargar los permisos del rol.');
-    })
-    .finally(() => {
-      // Ocultar spinner y mostrar lista
-      spinner.style.display = 'none';
-      listaModulos.style.display = 'flex';
-    });
-}
+      })
+      .catch(err => {
+        console.error(err);
+        alert('No se pudieron cargar los módulos y opciones.');
+      });
+  }
 
 
+  function cargarPermisosRol(idRol) {
+    const spinner = document.getElementById('cargandoPermisos');
+    const listaModulos = document.getElementById('listaModulos');
+
+    // Mostrar spinner y ocultar lista
+    spinner.style.display = 'block';
+    listaModulos.style.display = 'none';
+
+    fetch(`/api/permisos-rol/${idRol}`)
+      .then(res => {
+        if (!res.ok) throw new Error('Error al cargar permisos del rol');
+        return res.json();
+      })
+      .then(data => {
+        limpiarPermisos();
+
+        if (data.permisos_rol && Array.isArray(data.permisos_rol)) {
+          const permisosPorModulo = {};
+
+          data.permisos_rol.forEach(permiso => {
+            if (!permiso.permiso) return;
+
+            const mid = permiso.id_modulo;
+            if (!permisosPorModulo[mid]) {
+              permisosPorModulo[mid] = {
+                general: false,
+                opciones: new Set()
+              };
+            }
+
+            if (!permiso.id_opcion) {
+              permisosPorModulo[mid].general = true;
+            } else {
+              permisosPorModulo[mid].opciones.add(permiso.id_opcion);
+            }
+          });
+
+          Object.entries(permisosPorModulo).forEach(([mid, permisos]) => {
+            const modChk = document.querySelector(`.modulo-check[data-modulo-id="${mid}"]`);
+            if (!modChk) return;
+
+            if (permisos.general) {
+              modChk.checked = true;
+              document.querySelectorAll(`.opcion-check[data-modulo-id="${mid}"]`).forEach(op => op.checked = true);
+            } else {
+              permisos.opciones.forEach(oid => {
+                const opChk = document.querySelector(`.opcion-check[data-opcion-id="${oid}"]`);
+                if (opChk) opChk.checked = true;
+              });
+            }
+          });
+        }
+      })
+      .catch(err => {
+        console.error(err);
+        alert('No se pudieron cargar los permisos del rol.');
+      })
+      .finally(() => {
+        // Ocultar spinner y mostrar lista
+        spinner.style.display = 'none';
+        listaModulos.style.display = 'flex';
+      });
+  }
 
 
-function guardarPermisos() {
+
+
+  function guardarPermisos() {
     const idRol = document.getElementById('selectRol').value;
     if (!idRol) {
-        alert('Por favor, selecciona un rol.');
-        return;
+      alert('Por favor, selecciona un rol.');
+      return;
     }
 
     const permisos = [];
 
     document.querySelectorAll('.modulo-check').forEach(modCheck => {
-        if (modCheck.checked) {
-            permisos.push({ 
-              tipo: 'modulo', 
-              id_modulo: modCheck.dataset.moduloId,
-              id_opcion: null
-            });
-        }
+      if (modCheck.checked) {
+        permisos.push({
+          tipo: 'modulo',
+          id_modulo: modCheck.dataset.moduloId,
+          id_opcion: null
+        });
+      }
     });
 
     document.querySelectorAll('.opcion-check').forEach(opCheck => {
-        if (opCheck.checked) {
-            permisos.push({ 
-              tipo: 'opcion', 
-              id_modulo: opCheck.dataset.moduloId,
-              id_opcion: opCheck.dataset.opcionId
-            });
-        }
+      if (opCheck.checked) {
+        permisos.push({
+          tipo: 'opcion',
+          id_modulo: opCheck.dataset.moduloId,
+          id_opcion: opCheck.dataset.opcionId
+        });
+      }
     });
 
     console.log("📤 Enviando:", { id_rol: idRol, permisos }); // DEBUG opcional
 
     fetch('/api/guardar-permisos-rol', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ id_rol: idRol, permisos })
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id_rol: idRol, permisos })
     })
-    .then(res => {
+      .then(res => {
         if (!res.ok) throw new Error('Error al guardar permisos');
         return res.json();
-    })
-    .then(response => {
+      })
+      .then(response => {
         alert(response.message || 'Permisos guardados correctamente');
-    })
-    .catch(err => {
+      })
+      .catch(err => {
         console.error(err);
         alert('Error al guardar permisos.');
-    });
-}
+      });
+  }
 
 
-// Control padre-hijo: marcar/desmarcar opciones cuando se marca un módulo
-document.addEventListener('change', function (e) {
+  // Control padre-hijo: marcar/desmarcar opciones cuando se marca un módulo
+  document.addEventListener('change', function (e) {
     if (e.target.classList.contains('modulo-check')) {
-        const moduloId = e.target.dataset.moduloId;
-        const checked = e.target.checked;
-        document.querySelectorAll(`.opcion-check[data-modulo-id="${moduloId}"]`).forEach(op => op.checked = checked);
-        document.querySelectorAll(`.accion-check[data-modulo-id="${moduloId}"]`).forEach(ac => ac.checked = checked);
+      const moduloId = e.target.dataset.moduloId;
+      const checked = e.target.checked;
+      document.querySelectorAll(`.opcion-check[data-modulo-id="${moduloId}"]`).forEach(op => op.checked = checked);
+      document.querySelectorAll(`.accion-check[data-modulo-id="${moduloId}"]`).forEach(ac => ac.checked = checked);
     }
-});
+  });
 
-// Control padre-hijo: marcar/desmarcar acciones cuando se marca una opción
-document.addEventListener('change', function (e) {
+  // Control padre-hijo: marcar/desmarcar acciones cuando se marca una opción
+  document.addEventListener('change', function (e) {
     if (e.target.classList.contains('opcion-check')) {
-        const opcionId = e.target.dataset.opcionId;
-        const checked = e.target.checked;
-        document.querySelectorAll(`.accion-check[data-opcion-id="${opcionId}"]`).forEach(ac => ac.checked = checked);
+      const opcionId = e.target.dataset.opcionId;
+      const checked = e.target.checked;
+      document.querySelectorAll(`.accion-check[data-opcion-id="${opcionId}"]`).forEach(ac => ac.checked = checked);
     }
-});
+  });
 </script>
 
 {% endblock %}

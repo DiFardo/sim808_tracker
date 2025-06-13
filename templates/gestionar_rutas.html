@@ -85,6 +85,17 @@
 {% block contenido %}
 <div id="content">
     <div class="main-content">
+        <nav aria-label="breadcrumb" class="mb-3">
+            <ol class="breadcrumb">
+                {% for crumb in breadcrumbs %}
+                {% if loop.last %}
+                <li class="breadcrumb-item active" aria-current="page">{{ crumb.name }}</li>
+                {% else %}
+                <li class="breadcrumb-item"><a href="{{ crumb.url }}">{{ crumb.name }}</a></li>
+                {% endif %}
+                {% endfor %}
+            </ol>
+        </nav>
         <div class="container py-4">
             <h2 class="mb-4">Gestión de Rutas</h2>
 

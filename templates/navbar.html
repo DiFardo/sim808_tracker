@@ -109,154 +109,148 @@
 
 <body>
     <div class="wrapper sidebar-active">
-        <nav id="sidebar" class="sidebar js-sidebar">
-            <div class="sidebar-content js-simplebar">
-                <a class="sidebar-brand" href="/index">
-                    <span class="align-middle">Monitoreo de flota</span>
-                </a>
+        <div class="wrapper">
+            <!-- Sidebar -->
+            <nav id="sidebar" class="sidebar js-sidebar">
+                <div class="sidebar-content js-simplebar">
 
-                <ul class="sidebar-nav">
-                    <li class="sidebar-header">Gestión</li>
+                    <!-- BOTÓN PARA CERRAR MENÚ (solo móvil) -->
+                    <div class="sidebar-toggle-close d-md-none text-end p-2">
+                        <button class="btn btn-sm btn-light" id="btnCerrarMenu">
+                            <span class="material-icons">close</span>
+                        </button>
+                    </div>
 
-                    <li class="sidebar-item active">
-                        <a class="sidebar-link" href="/index">
-                            <i class="align-middle" data-feather="sliders"></i> <span class="align-middle">Inicio</span>
-                        </a>
-                    </li>
+                    <a class="sidebar-brand" href="/index">
+                        <span class="align-middle">Monitoreo de flota</span>
+                    </a>
 
-                    <li class="sidebar-item">
-                        <a class="sidebar-link" href="{{ url_for('vehiculos') }}">
-                            <i class="align-middle" data-feather="table"></i> <span class="align-middle">Flotas</span>
-                        </a>
-                    </li>
-
-                    <li class="sidebar-item">
-                        <a class="sidebar-link" href="{{ url_for('mapa_flotas') }}">
-                            <i class="align-middle" data-feather="calendar"></i> <span class="align-middle">Mapa</span>
-                        </a>
-                    </li>
-                    <!-- <li class="sidebar-item">
-                        <a class="sidebar-link" href="{{ url_for('rutas_programadas') }}">
-                            <i class="align-middle" data-feather="map"></i>
-                            <span class="align-middle">Rutas programadas</span>
-                        </a>
-                    </li> -->
-                     <li class="sidebar-item">
-                        <a class="sidebar-link" href="{{ url_for('gestionar_rutas') }}">
-                            <i class="align-middle" data-feather="map"></i>
-                            <span class="align-middle">Rutas programadas</span>
-                        </a>
-                    </li>
-
-                    <li class="sidebar-item">
-                        <a class="sidebar-link" href="/gestion_productos">
-                            <i class="align-middle" data-feather="list"></i> <span class="align-middle">Alertas</span>
-                        </a>
-                    </li>
-
-                    <li class="sidebar-header">Herramientas</li>
-
-                    <li class="sidebar-item">
-                        <a class="sidebar-link" href="#">
-                            <i class="align-middle" data-feather="bar-chart-2"></i> <span
-                                class="align-middle">Reportes</span>
-                        </a>
-                    </li>
-                    <li class="sidebar-item">
-                        <a class="sidebar-link" href="{{ url_for('permisos') }}">
-                            <i class="align-middle" data-feather="shield"></i> <span
-                                class="align-middle">Permisos</span>
-                        </a>
-
-                    </li>
-
-                    <li class="sidebar-item">
-                        <a class="sidebar-link" href="{{ url_for('usuarios') }}">
-                            <i class="align-middle" data-feather="user"></i> <span class="align-middle">Usuarios</span>
-                        </a>
-                    </li>
-                </ul>
-            </div>
-        </nav>
+                    <ul class="sidebar-nav">
+                        <li class="sidebar-header">Gestión</li>
+                        <li class="sidebar-item active">
+                            <a class="sidebar-link" href="/index">
+                                <i class="align-middle" data-feather="sliders"></i>
+                                <span class="align-middle">Inicio</span>
+                            </a>
+                        </li>
+                        <li class="sidebar-item">
+                            <a class="sidebar-link" href="{{ url_for('vehiculos') }}">
+                                <i class="align-middle" data-feather="table"></i>
+                                <span class="align-middle">Flotas</span>
+                            </a>
+                        </li>
+                        <li class="sidebar-item">
+                            <a class="sidebar-link" href="{{ url_for('mapa_flotas') }}">
+                                <i class="align-middle" data-feather="calendar"></i>
+                                <span class="align-middle">Mapa</span>
+                            </a>
+                        </li>
+                        <li class="sidebar-item">
+                            <a class="sidebar-link" href="{{ url_for('gestionar_rutas') }}">
+                                <i class="align-middle" data-feather="map"></i>
+                                <span class="align-middle">Rutas programadas</span>
+                            </a>
+                        </li>
+                        <li class="sidebar-item">
+                            <a class="sidebar-link" href="/gestion_productos">
+                                <i class="align-middle" data-feather="list"></i>
+                                <span class="align-middle">Alertas</span>
+                            </a>
+                        </li>
+                        <li class="sidebar-header">Herramientas</li>
+                        <li class="sidebar-item">
+                            <a class="sidebar-link" href="#">
+                                <i class="align-middle" data-feather="bar-chart-2"></i>
+                                <span class="align-middle">Reportes</span>
+                            </a>
+                        </li>
+                        <li class="sidebar-item">
+                            <a class="sidebar-link" href="{{ url_for('permisos') }}">
+                                <i class="align-middle" data-feather="shield"></i>
+                                <span class="align-middle">Permisos</span>
+                            </a>
+                        </li>
+                        <li class="sidebar-item">
+                            <a class="sidebar-link" href="{{ url_for('usuarios') }}">
+                                <i class="align-middle" data-feather="user"></i>
+                                <span class="align-middle">Usuarios</span>
+                            </a>
+                        </li>
+                    </ul>
+                </div>
+            </nav>
 
 
-        <!-- Contenido Principal -->
-        <div id="content">
-            <div class="top-navbar text-white">
-                <div class="d-flex align-items-center justify-content-between px-3 py-2">
-                    <!-- Menú de Hamburguesa -->
-                    <div class="col-2 col-md-1 align-self-center">
-                        <div class="xp-menubar">
-                            <span class="material-icons text-white">signal_cellular_alt</span>
+            <!-- Contenido Principal -->
+            <div id="content">
+                <div class="top-navbar text-white">
+                    <div class="d-flex align-items-center justify-content-between px-3 py-2">
+                        <!-- Menú de Hamburguesa -->
+                        <div class="col-2 col-md-1 align-self-center">
+                            <div class="xp-menubar">
+                                <span class="material-icons text-white">signal_cellular_alt</span>
+                            </div>
+                        </div>
+
+                        <!-- Notificaciones y Perfil -->
+                        <div class="d-flex align-items-center">
+
+                            <a href="#" class="d-flex align-items-center gap-2 text-white text-decoration-none"
+                                id="profile-icon" onclick="mostrarVentana('perfil')">
+                                <span class="material-icons fs-2 align-middle">account_circle</span>
+                                <div class="d-flex flex-column d-none d-md-flex">
+                                    <span class="fw-semibold">{{ usuario[4] }}
+                                        <span class="status-indicator bg-success"></span>
+                                    </span>
+                                </div>
+                            </a>
+
+
+
                         </div>
                     </div>
-
-                    <!-- Notificaciones y Perfil -->
-                    <div class="d-flex align-items-center">
-                        <a href="#" class="text-white me-3" id="notification-icon"
-                            onclick="mostrarVentana('notificaciones')">
-                            <span class="material-icons">notifications</span>
-                            {% if notificaciones and notificaciones|length > 0 %}
-                            <span class="badge bg-danger rounded-circle" id="notification-count">{{
-                                notificaciones|length }}</span>
-                            {% endif %}
-                        </a>
-                        <a href="#" class="d-flex align-items-center gap-2 text-white text-decoration-none"
-                            id="profile-icon" onclick="mostrarVentana('perfil')">
-                            <span class="material-icons fs-2 align-middle">account_circle</span>
-                            <div class="d-flex flex-column d-none d-md-flex">
-                                <span class="fw-semibold">{{ usuario[4] }}
-                                    <span class="status-indicator bg-success"></span>
-                                </span>
-                            </div>
-                        </a>
-
-
-
-                    </div>
                 </div>
-            </div>
 
-            <!-- Ventana Flotante -->
-            <div id="ventana-flotante" class="ventana-flotante hidden">
-                <div id="contenido-notificaciones" class="contenido-flotante">
+                <!-- Ventana Flotante -->
+                <div id="ventana-flotante" class="ventana-flotante hidden">
+                    <!-- <div id="contenido-notificaciones" class="contenido-flotante">
                     <h5>
                         <span class="material-icons">notifications</span>
                         Notificaciones
                     </h5>
                     <p>No hay notificaciones nuevas.</p>
-                </div>
-                <div id="contenido-perfil" class="contenido-flotante hidden">
-                    <h5 class="text-center mb-3">
-                        <span class="material-icons">person</span>
-                        Perfil de Usuario
-                    </h5>
-                    <p><strong>Nombre:</strong> {{ usuario[4] }}</p>
-                    <p><strong>Rol:</strong> {{ usuario[5] }}</p>
-                    <div class="d-grid gap-2">
-                        <a href="/procesar_logout" class="btn btn-danger btn-sm">Cerrar Sesión</a>
+                </div> -->
+                    <div id="contenido-perfil" class="contenido-flotante hidden">
+                        <h5 class="text-center mb-3">
+                            <span class="material-icons">person</span>
+                            Perfil de Usuario
+                        </h5>
+                        <p><strong>Nombre:</strong> {{ usuario[4] }}</p>
+                        <p><strong>Rol:</strong> {{ usuario[5] }}</p>
+                        <div class="d-grid gap-2">
+                            <a href="/procesar_logout" class="btn btn-danger btn-sm">Cerrar Sesión</a>
+                        </div>
                     </div>
                 </div>
             </div>
         </div>
-    </div>
-    <!-- Contenido del perfil -->
-    <div id="contenido-perfil" class="contenido-flotante hidden">
-        <h5 class="text-center mb-3">
-            <span class="material-icons">person</span>
-            Perfil de Usuario
-        </h5>
-        <p><strong>Nombre:</strong> {{ usuario[4] }}</p>
-        <p><strong>Rol:</strong> {{ usuario[5] }}</p>
-        <div class="d-flex justify-content-between mt-4">
-            <a href="{}" class="btn btn-primary w-50 me-2">
-                Ver Perfil
-            </a>
-            <a href="/procesar_logout" class="btn btn-danger w-50 ms-2">
-                Cerrar Sesión
-            </a>
+        <!-- Contenido del perfil -->
+        <div id="contenido-perfil" class="contenido-flotante hidden">
+            <h5 class="text-center mb-3">
+                <span class="material-icons">person</span>
+                Perfil de Usuario
+            </h5>
+            <p><strong>Nombre:</strong> {{ usuario[4] }}</p>
+            <p><strong>Rol:</strong> {{ usuario[5] }}</p>
+            <div class="d-flex justify-content-between mt-4">
+                <a href="{}" class="btn btn-primary w-50 me-2">
+                    Ver Perfil
+                </a>
+                <a href="/procesar_logout" class="btn btn-danger w-50 ms-2">
+                    Cerrar Sesión
+                </a>
+            </div>
         </div>
-    </div>
     </div>
 
 
@@ -284,60 +278,6 @@
     </div>
 
     <script>
-        // Opciones por módulo en un array de objetos
-        const modules = {
-            "menu": [
-                { title: "Productos", url: "/gestion_productos", icon: "restaurant_menu" },
-                { title: "Menú", url: "/gestion_menu_dia", icon: "today" },
-                { title: "Mesas", url: "/gestion_mesas_menu", icon: "table_bar" }
-            ],
-            "contable": [
-                { title: "Cuentas Contables", url: "/cuentas", icon: "folder" },
-                { title: "Libros Contables", url: "/libros", icon: "library_books" }
-            ]
-        };
-
-        // Función para renderizar las opciones del módulo en el sidebar
-        function renderModuleOptions(moduleKey) {
-            const navbarOptions = document.getElementById('navbar-options');
-            const currentOptions = modules[moduleKey] || [];
-
-            // Limpia las opciones existentes
-            navbarOptions.innerHTML = `
-                <li class="nav-item">
-                    <a href="{{ url_for('index') }}" class="dashboard">
-                        <i class="material-icons">dashboard</i>
-                        <span>Inicio</span>
-                    </a>
-                </li>
-            `;
-
-            // Agrega las opciones del módulo actual
-            currentOptions.forEach(option => {
-                navbarOptions.innerHTML += `
-                    <li class="nav-item">
-                        <a href="${option.url}">
-                            <i class="material-icons">${option.icon}</i>
-                            <span>${option.title}</span>
-                        </a>
-                    </li>
-                `;
-            });
-        }
-
-        // Detectar el módulo activo basado en el path actual
-        document.addEventListener("DOMContentLoaded", function () {
-            const currentPath = window.location.pathname;
-
-            // Detectar módulo basado en el path
-            if (currentPath.includes('gestion_productos') || currentPath.includes('menu_del_dia') || currentPath.includes('mesas_menu')) {
-                renderModuleOptions("menu");
-            } else if (currentPath.includes('cuentas') || currentPath.includes('libros')) {
-                renderModuleOptions("contable");
-            } else {
-                renderModuleOptions(""); // Default (solo inicio)
-            }
-        });
 
 
         function mostrarVentana(tipo) {
@@ -363,6 +303,8 @@
             }
         });
     </script>
+
+
 
 
 </body>
