@@ -421,7 +421,27 @@
     }
 
     bufferPuntosCrudos.push(nuevaPos);
-    if (bufferPuntosCrudos.length < 3) return;
+
+    const MIN_PUNTOS = 2;
+    const MAX_PUNTOS = 10;
+
+    if (bufferPuntosCrudos.length > MAX_PUNTOS) {
+      bufferPuntosCrudos.shift(); // elimina el más antiguo
+    }
+
+    if (bufferPuntosCrudos.length < MIN_PUNTOS) return;
+
+    // Verificar si todos los puntos son iguales (no moverse)
+    const todosIguales = bufferPuntosCrudos.every((p, i, arr) => {
+      if (i === 0) return true;
+      const anterior = arr[i - 1];
+      const dist = google.maps.geometry.spherical.computeDistanceBetween(
+        new google.maps.LatLng(p.lat, p.lng),
+        new google.maps.LatLng(anterior.lat, anterior.lng)
+      );
+      return dist < 5;
+    });
+    if (todosIguales) return;
 
     const pathParam = bufferPuntosCrudos.map(p => `${p.lat},${p.lng}`).join("|");
 
@@ -480,12 +500,13 @@
         });
 
         ultimaLatLon = puntoFinal;
-        bufferPuntosCrudos = [puntoFinal];
+        bufferPuntosCrudos = [puntoFinal]; // continuar desde último
       }
     } catch (error) {
       console.error("❌ Error al usar Snap to Roads con interpolación:", error);
     }
   }
+
 
 
 
