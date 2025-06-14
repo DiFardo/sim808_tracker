@@ -203,7 +203,9 @@
     const chart = new Chart(ctx, {
       type: 'doughnut',
       data: {
-        labels: [{% for dia in dias_top_rutas %}'{{ dia.fecha.strftime('% d % b') }}'{% if not loop.last %}, {% endif %}{% endfor %}],
+        labels: [{% for dia in dias_top_rutas %}'{{ dia.fecha.strftime('%d %b') }}'{% if not loop.last %}, {% endif %}{% endfor %}],
+
+
     datasets: [{
       data: [{% for dia in dias_top_rutas %}{{ dia.total_rutas }}{% if not loop.last %}, {% endif %} {% endfor %}],
   backgroundColor: ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#6366f1'],

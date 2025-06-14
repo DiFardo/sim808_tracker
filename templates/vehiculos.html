@@ -119,24 +119,24 @@
     margin-bottom: 1.5rem;
     z-index: 10;
   }
+
   .image-preview-box {
-  width: 100%;
-  height: 250px;
-  border: 1px dashed #ccc;
-  border-radius: 6px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  overflow: hidden;
-  background-color: #f8f9fa;
-}
+    width: 100%;
+    height: 250px;
+    border: 1px dashed #ccc;
+    border-radius: 6px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    overflow: hidden;
+    background-color: #f8f9fa;
+  }
 
-.image-preview-box img {
-  max-width: 100%;
-  max-height: 100%;
-  object-fit: contain;
-}
-
+  .image-preview-box img {
+    max-width: 100%;
+    max-height: 100%;
+    object-fit: contain;
+  }
 </style>
 <div id="content">
   <div class="main-content">
@@ -160,18 +160,25 @@
         </button>
       </div>
       <div class="btn-group">
+
+        {% if mostrar_boton_añadir %}
         <button class="btn btn-success btn-sm" data-bs-toggle="modal" data-bs-target="#modalVehiculo">
           <i class="material-icons">add</i> Nuevo Vehículo
         </button>
+        {% endif %}
+
+        {% if mostrar_icono_editar %}
         <button class="btn btn-primary btn-sm" id="btnToggleEdicion">
           <i class="material-icons">edit</i> <span id="textoEdicion">Editar</span>
         </button>
+        {% endif %}
 
-
+        {% if mostrar_icono_eliminar %}
         <button class="btn btn-danger btn-sm" id="btnToggleEliminar">
           <i class="material-icons">delete</i> <span id="textoEliminar">Eliminar</span>
         </button>
-        
+        {% endif %}
+
       </div>
     </div>
 
@@ -185,7 +192,7 @@
           <div class="delete-icon" onclick="eliminarVehiculo({{ vehiculo.id }})">
             <i class="material-icons">close</i>
           </div>
-          
+
           <img src="{{ vehiculo.imagen or url_for('static', filename='img/vehiculos/default.png') }}"
             alt="{{ vehiculo.placa }}">
           <h5>{{ vehiculo.modelo }}</h5>
@@ -228,6 +235,7 @@
                 <label for="anio" class="form-label">Año</label>
                 <input type="number" class="form-control" id="anio" name="anio" min="1900" max="2099" required>
               </div>
+              {% if mostrar_selector_estado %}
               <div class="mb-3">
                 <label for="estado" class="form-label">Estado</label>
                 <select class="form-select" id="estado" name="estado" required>
@@ -235,6 +243,13 @@
                   <option value="false">Inactivo</option>
                 </select>
               </div>
+              {% else %}
+              <div class="mb-3">
+                <label class="form-label">Estado</label>
+                <input type="text" class="form-control" value="{{ estado_actual | capitalize }}" readonly>
+              </div>
+              {% endif %}
+
             </div>
             <div class="col-md-6">
               <div class="mb-3">
@@ -393,17 +408,17 @@
 </script>
 <script>
   let modoEliminarActivo = false;
-  
+
   document.getElementById("btnToggleEliminar").addEventListener("click", function () {
     modoEliminarActivo = !modoEliminarActivo;
-  
+
     const deleteIcons = document.querySelectorAll(".delete-icon");
     const textoBoton = document.getElementById("textoEliminar");
-  
+
     deleteIcons.forEach(icon => {
       icon.style.display = modoEliminarActivo ? "inline-block" : "none";
     });
-  
+
     // Cambiar texto y color del botón
     if (modoEliminarActivo) {
       textoBoton.textContent = "Cancelar";
@@ -415,30 +430,30 @@
       this.classList.add("btn-danger");
     }
   });
-  </script>
-  
-  <script>
-    function eliminarVehiculo(id) {
-      if (!confirm("¿Estás seguro de que deseas eliminar este vehículo?")) return;
-    
-      fetch(`/api/vehiculo/${id}`, {
-        method: "DELETE"
+</script>
+
+<script>
+  function eliminarVehiculo(id) {
+    if (!confirm("¿Estás seguro de que deseas eliminar este vehículo?")) return;
+
+    fetch(`/api/vehiculo/${id}`, {
+      method: "DELETE"
+    })
+      .then(response => response.json())
+      .then(data => {
+        if (data.success) {
+          alert("Vehículo eliminado correctamente.");
+          location.reload();
+        } else {
+          alert("Error al eliminar vehículo: " + data.message);
+        }
       })
-        .then(response => response.json())
-        .then(data => {
-          if (data.success) {
-            alert("Vehículo eliminado correctamente.");
-            location.reload();
-          } else {
-            alert("Error al eliminar vehículo: " + data.message);
-          }
-        })
-        .catch(err => {
-          console.error("Error al eliminar vehículo:", err);
-          alert("No se pudo conectar con el servidor.");
-        });
-    }
-    </script>
-    
+      .catch(err => {
+        console.error("Error al eliminar vehículo:", err);
+        alert("No se pudo conectar con el servidor.");
+      });
+  }
+</script>
+
 
 {% endblock %}

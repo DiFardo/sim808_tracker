@@ -226,16 +226,19 @@ def usuarios():
     mostrar_boton_añadir = tiene_permiso(permisos, id_modulo=1, id_opcion=1)  # módulo Usuarios, opción Agregar usuario
     mostrar_icono_editar = tiene_permiso(permisos, id_modulo=1, id_opcion=2)  # opción Editar usuario
     mostrar_icono_eliminar = tiene_permiso(permisos, id_modulo=1, id_opcion=3)  # opción Eliminar usuario
+    mostrar_icono_estado = tiene_permiso(permisos, id_modulo=1, id_opcion=4)  # opción Cambiar estado usuario
+
 
     usuarios_por_rol = controlador_usuarios.obtener_usuarios_por_rol()
 
     return render_template('usuarios.html',
-                           usuario=usuario,
-                           usuarios_admin=usuarios_por_rol.get("Administrador", []),
-                           usuarios_conductor=usuarios_por_rol.get("Conductor", []),
-                           mostrar_boton_añadir=mostrar_boton_añadir,
-                           mostrar_icono_editar=mostrar_icono_editar,
-                           mostrar_icono_eliminar=mostrar_icono_eliminar)
+                       usuario=usuario,
+                       usuarios_admin=usuarios_por_rol.get("Administrador", []),
+                       usuarios_conductor=usuarios_por_rol.get("Conductor", []),
+                       mostrar_boton_añadir=mostrar_boton_añadir,
+                       mostrar_icono_editar=mostrar_icono_editar,
+                       mostrar_icono_eliminar=mostrar_icono_eliminar,
+                       mostrar_icono_estado=mostrar_icono_estado)  # <-- nueva variable
 
 
 #OBTENER USUARIOS
@@ -314,18 +317,30 @@ def api_actualizar_estado_usuario(id_usuario):
         return jsonify({"success": False, "message": str(e)}), 500
 
 
-# VEHICULOS 
 @app.route("/vehiculos")
 @jwt_required()
 def vehiculos():
     dni_usuario = get_jwt_identity()
     usuario = controlador_usuarios.obtener_usuario(dni_usuario)
+
+    permisos = obtener_permisos_rol(usuario['rol_id'])
+
+    # Usa los ID reales de la tabla permisos_roles
+    mostrar_boton_añadir = tiene_permiso(permisos, id_modulo=2, id_opcion=9)
+    mostrar_icono_editar = tiene_permiso(permisos, id_modulo=2, id_opcion=10)
+    mostrar_icono_eliminar = tiene_permiso(permisos, id_modulo=2, id_opcion=11)
+    mostrar_selector_estado = tiene_permiso(permisos, id_modulo=2, id_opcion=12)
+
     vehiculos = obtener_vehiculos()
-    breadcrumbs = [
-        {"name": "Inicio", "url": "/index"},
-        {"name": "Vehículos", "url": "/vehiculos"}
-    ]
-    return render_template("vehiculos.html", usuario=usuario, vehiculos=vehiculos, breadcrumbs=breadcrumbs)
+
+    return render_template("vehiculos.html",
+                           usuario=usuario,
+                           vehiculos=vehiculos,
+                           mostrar_boton_añadir=mostrar_boton_añadir,
+                           mostrar_icono_editar=mostrar_icono_editar,
+                           mostrar_icono_eliminar=mostrar_icono_eliminar,
+                           mostrar_selector_estado=mostrar_selector_estado)
+
 
 
 @app.route("/api/vehiculos", methods=["GET"])

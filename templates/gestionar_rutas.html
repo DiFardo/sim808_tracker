@@ -158,47 +158,47 @@
 
                         <div class="col-lg-6 table-section">
                             <h5 class="mb-3">Rutas Programadas</h5>
-                            <!-- tabla con estilos -->
-                            <table id="tablaRutas" class="table table-bordered table-hover tabla-rutas">
 
-                                <thead class="table-light">
-                                    <tr>
-                                        <th class="col-destino">Ruta (Destino)</th>
-                                        <th class="col-fecha">Fecha</th>
-                                        <th class="col-vehiculo">Vehículo</th>
-                                        <th class="text-center">Acciones</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    {% for ruta in rutas_programadas %}
-                                    <tr data-id="{{ ruta.id }}">
-                                        <td class="col-destino">
-                                            {{ ruta.destino.split(',')[0] }}
-                                        </td>
-                                        <td class="col-fecha">{{ ruta.fecha }}</td>
-                                        <td class="col-vehiculo">{{ ruta.vehiculo }}</td>
-                                        <td class="text-center">
-                                            <div class="d-flex justify-content-center gap-2">
-                                                <button class="btn btn-success btn-sm btnEditarRuta"
-                                                    data-id="{{ ruta.id }}" data-conductor="{{ ruta.id_persona }}"
-                                                    data-vehiculo="{{ ruta.id_vehiculo }}"
-                                                    data-destino="{{ ruta.destino }}" data-lat="{{ ruta.destino_lat }}"
-                                                    data-lon="{{ ruta.destino_lon }}" data-fecha="{{ ruta.fecha }}">
-                                                    <i class="fas fa-pen"></i>
-                                                </button>
-                                                <button class="btn btn-danger btn-sm btnEliminarRuta"
-                                                    data-id="{{ ruta.id }}" data-vehiculo="{{ ruta.id_vehiculo }}">
-                                                    <i class="fas fa-trash-alt"></i>
-                                                </button>
-                                            </div>
-                                        </td>
-                                    </tr>
-                                    {% endfor %}
-                                </tbody>
-
-
-                            </table>
+                            <!-- envoltorio responsivo -->
+                            <div class="table-responsive">
+                                <table id="tablaRutas" class="table table-bordered table-hover tabla-rutas">
+                                    <thead class="table-light">
+                                        <tr>
+                                            <th class="col-destino">Ruta (Destino)</th>
+                                            <th class="col-fecha">Fecha</th>
+                                            <th class="col-vehiculo">Vehículo</th>
+                                            <th class="text-center">Acciones</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {% for ruta in rutas_programadas %}
+                                        <tr data-id="{{ ruta.id }}">
+                                            <td class="col-destino">{{ ruta.destino.split(',')[0] }}</td>
+                                            <td class="col-fecha">{{ ruta.fecha }}</td>
+                                            <td class="col-vehiculo">{{ ruta.vehiculo }}</td>
+                                            <td class="text-center">
+                                                <div class="d-flex justify-content-center gap-2">
+                                                    <button class="btn btn-success btn-sm btnEditarRuta"
+                                                        data-id="{{ ruta.id }}" data-conductor="{{ ruta.id_persona }}"
+                                                        data-vehiculo="{{ ruta.id_vehiculo }}"
+                                                        data-destino="{{ ruta.destino }}"
+                                                        data-lat="{{ ruta.destino_lat }}"
+                                                        data-lon="{{ ruta.destino_lon }}" data-fecha="{{ ruta.fecha }}">
+                                                        <i class="fas fa-pen"></i>
+                                                    </button>
+                                                    <button class="btn btn-danger btn-sm btnEliminarRuta"
+                                                        data-id="{{ ruta.id }}" data-vehiculo="{{ ruta.id_vehiculo }}">
+                                                        <i class="fas fa-trash-alt"></i>
+                                                    </button>
+                                                </div>
+                                            </td>
+                                        </tr>
+                                        {% endfor %}
+                                    </tbody>
+                                </table>
+                            </div>
                         </div>
+
                     </div>
                 </div>
 

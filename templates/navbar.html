@@ -105,6 +105,7 @@
             color: #2ccc74 !important;
         }
     </style>
+
 </head>
 
 <body>
@@ -114,7 +115,7 @@
             <nav id="sidebar" class="sidebar js-sidebar">
                 <div class="sidebar-content js-simplebar">
 
-                    <!-- BOTÓN PARA CERRAR MENÚ (solo móvil) -->
+                    <!-- BOTÓN PARA CERRAR MENÚ (solo en dispositivos móviles) -->
                     <div class="sidebar-toggle-close d-md-none text-end p-2">
                         <button class="btn btn-sm btn-light" id="btnCerrarMenu">
                             <span class="material-icons">close</span>
@@ -126,59 +127,73 @@
                     </a>
 
                     <ul class="sidebar-nav">
+
+                        <!-- Sección: Gestión -->
                         <li class="sidebar-header">Gestión</li>
+
                         <li class="sidebar-item active">
                             <a class="sidebar-link" href="/index">
                                 <i class="align-middle" data-feather="sliders"></i>
                                 <span class="align-middle">Inicio</span>
                             </a>
                         </li>
+
                         <li class="sidebar-item">
                             <a class="sidebar-link" href="{{ url_for('vehiculos') }}">
-                                <i class="align-middle" data-feather="table"></i>
+                                <i class="align-middle" data-feather="truck"></i>
                                 <span class="align-middle">Flotas</span>
                             </a>
                         </li>
+
                         <li class="sidebar-item">
                             <a class="sidebar-link" href="{{ url_for('mapa_flotas') }}">
-                                <i class="align-middle" data-feather="calendar"></i>
+                                <i class="align-middle" data-feather="map"></i>
                                 <span class="align-middle">Mapa</span>
                             </a>
                         </li>
+
                         <li class="sidebar-item">
                             <a class="sidebar-link" href="{{ url_for('gestionar_rutas') }}">
-                                <i class="align-middle" data-feather="map"></i>
+                                <i class="align-middle" data-feather="navigation"></i>
                                 <span class="align-middle">Rutas programadas</span>
                             </a>
                         </li>
+
                         <li class="sidebar-item">
                             <a class="sidebar-link" href="/gestion_productos">
-                                <i class="align-middle" data-feather="list"></i>
+                                <i class="align-middle" data-feather="alert-triangle"></i>
                                 <span class="align-middle">Alertas</span>
                             </a>
                         </li>
+
+                        <!-- Sección: Herramientas -->
                         <li class="sidebar-header">Herramientas</li>
+
                         <li class="sidebar-item">
                             <a class="sidebar-link" href="#">
                                 <i class="align-middle" data-feather="bar-chart-2"></i>
                                 <span class="align-middle">Reportes</span>
                             </a>
                         </li>
+
                         <li class="sidebar-item">
                             <a class="sidebar-link" href="{{ url_for('permisos') }}">
                                 <i class="align-middle" data-feather="shield"></i>
                                 <span class="align-middle">Permisos</span>
                             </a>
                         </li>
+
                         <li class="sidebar-item">
                             <a class="sidebar-link" href="{{ url_for('usuarios') }}">
                                 <i class="align-middle" data-feather="user"></i>
                                 <span class="align-middle">Usuarios</span>
                             </a>
                         </li>
+
                     </ul>
                 </div>
             </nav>
+
 
 
             <!-- Contenido Principal -->
@@ -303,6 +318,30 @@
             }
         });
     </script>
+    <script>
+        document.addEventListener("DOMContentLoaded", function () {
+            const layout = document.getElementById("layoutWrapper");
+            const menubar = document.querySelector(".xp-menubar");
+            const cerrarMenuBtn = document.getElementById("btnCerrarMenu");
+
+            menubar?.addEventListener("click", function () {
+                layout.classList.toggle("sidebar-hidden");
+                layout.classList.toggle("sidebar-visible");
+            });
+
+            cerrarMenuBtn?.addEventListener("click", function () {
+                layout.classList.remove("sidebar-visible");
+                layout.classList.add("sidebar-hidden");
+            });
+
+            // Para móviles: iniciar oculto
+            if (window.innerWidth <= 768) {
+                layout.classList.remove("sidebar-visible");
+                layout.classList.add("sidebar-hidden");
+            }
+        });
+    </script>
+
 
 
 

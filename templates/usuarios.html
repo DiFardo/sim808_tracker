@@ -169,13 +169,18 @@
                                                 <td>{{ u.apellido }}</td>
                                                 <td>{{ u.rol }}</td>
                                                 <td class="text-center">
+                                                    {% if mostrar_icono_estado %}
                                                     <label class="switch">
                                                         <input type="checkbox" {% if u.estado=='Activo' %}checked{%
                                                             endif %} data-id="{{ u.id }}"
                                                             onchange="cambiarEstadoUsuario(this)">
                                                         <span class="slider"></span>
                                                     </label>
+                                                    {% else %}
+                                                    {{ u.estado }}
+                                                    {% endif %}
                                                 </td>
+
                                                 <td class="acciones text-center">
                                                     {% if mostrar_icono_editar %}
                                                     <i class="material-icons text-primary" title="Editar"
@@ -216,13 +221,18 @@
                                                 <td>{{ u.apellido }}</td>
                                                 <td>{{ u.rol }}</td>
                                                 <td class="text-center">
+                                                    {% if mostrar_icono_estado %}
                                                     <label class="switch">
                                                         <input type="checkbox" {% if u.estado=='Activo' %}checked{%
                                                             endif %} data-id="{{ u.id }}"
                                                             onchange="cambiarEstadoUsuario(this)">
                                                         <span class="slider"></span>
                                                     </label>
+                                                    {% else %}
+                                                    {{ u.estado }}
+                                                    {% endif %}
                                                 </td>
+
                                                 <td class="acciones text-center">
                                                     {% if mostrar_icono_editar %}
                                                     <i class="material-icons text-primary" title="Editar"

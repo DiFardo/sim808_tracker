@@ -193,7 +193,6 @@
     const spinner = document.getElementById('cargandoPermisos');
     const listaModulos = document.getElementById('listaModulos');
 
-    // Mostrar spinner y ocultar lista
     spinner.style.display = 'block';
     listaModulos.style.display = 'none';
 
@@ -206,38 +205,20 @@
         limpiarPermisos();
 
         if (data.permisos_rol && Array.isArray(data.permisos_rol)) {
-          const permisosPorModulo = {};
-
           data.permisos_rol.forEach(permiso => {
-            if (!permiso.permiso) return;
-
             const mid = permiso.id_modulo;
-            if (!permisosPorModulo[mid]) {
-              permisosPorModulo[mid] = {
-                general: false,
-                opciones: new Set()
-              };
-            }
+            const oid = permiso.id_opcion;
+            const estado = permiso.permiso;
 
-            if (!permiso.id_opcion) {
-              permisosPorModulo[mid].general = true;
+            if (oid === null) {
+              // permiso general del módulo
+              const modChk = document.querySelector(`.modulo-check[data-modulo-id="${mid}"]`);
+              if (modChk) modChk.checked = estado;
+              // También podrías usar esto si quieres sincronizar todas las opciones con el módulo general
+              // document.querySelectorAll(`.opcion-check[data-modulo-id="${mid}"]`).forEach(op => op.checked = estado);
             } else {
-              permisosPorModulo[mid].opciones.add(permiso.id_opcion);
-            }
-          });
-
-          Object.entries(permisosPorModulo).forEach(([mid, permisos]) => {
-            const modChk = document.querySelector(`.modulo-check[data-modulo-id="${mid}"]`);
-            if (!modChk) return;
-
-            if (permisos.general) {
-              modChk.checked = true;
-              document.querySelectorAll(`.opcion-check[data-modulo-id="${mid}"]`).forEach(op => op.checked = true);
-            } else {
-              permisos.opciones.forEach(oid => {
-                const opChk = document.querySelector(`.opcion-check[data-opcion-id="${oid}"]`);
-                if (opChk) opChk.checked = true;
-              });
+              const opChk = document.querySelector(`.opcion-check[data-opcion-id="${oid}"]`);
+              if (opChk) opChk.checked = estado;
             }
           });
         }
@@ -247,11 +228,11 @@
         alert('No se pudieron cargar los permisos del rol.');
       })
       .finally(() => {
-        // Ocultar spinner y mostrar lista
         spinner.style.display = 'none';
         listaModulos.style.display = 'flex';
       });
   }
+
 
 
 
@@ -265,25 +246,24 @@
 
     const permisos = [];
 
-    document.querySelectorAll('.modulo-check').forEach(modCheck => {
-      if (modCheck.checked) {
-        permisos.push({
-          tipo: 'modulo',
-          id_modulo: modCheck.dataset.moduloId,
-          id_opcion: null
-        });
-      }
+    document.querySelectorAll('.opcion-check').forEach(opCheck => {
+      permisos.push({
+        tipo: 'opcion',
+        id_modulo: opCheck.dataset.moduloId,
+        id_opcion: opCheck.dataset.opcionId,
+        permiso: opCheck.checked // true o false
+      });
     });
 
-    document.querySelectorAll('.opcion-check').forEach(opCheck => {
-      if (opCheck.checked) {
-        permisos.push({
-          tipo: 'opcion',
-          id_modulo: opCheck.dataset.moduloId,
-          id_opcion: opCheck.dataset.opcionId
-        });
-      }
+    document.querySelectorAll('.modulo-check').forEach(modCheck => {
+      permisos.push({
+        tipo: 'modulo',
+        id_modulo: modCheck.dataset.moduloId,
+        id_opcion: null,
+        permiso: modCheck.checked
+      });
     });
+
 
     console.log("📤 Enviando:", { id_rol: idRol, permisos }); // DEBUG opcional
 

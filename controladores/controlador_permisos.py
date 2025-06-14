@@ -76,31 +76,33 @@ def guardar_permisos_rol():
 
         sql_insert = """
             INSERT INTO permisos_roles (id_rol, id_modulo, id_opcion, permiso)
-            VALUES (%s, %s, %s, TRUE)
+            VALUES (%s, %s, %s, %s)
         """
 
         for permiso in permisos:
             tipo = permiso.get('tipo')
             id_modulo = permiso.get('id_modulo')
             id_opcion = permiso.get('id_opcion')
+            estado_permiso = permiso.get('permiso', False)  # default False si no viene
 
-            if tipo == 'modulo' and id_modulo:
-                cursor.execute(sql_insert, (id_rol, id_modulo, None))
-            elif tipo == 'opcion' and id_modulo and id_opcion:
-                cursor.execute(sql_insert, (id_rol, id_modulo, id_opcion))
+            if tipo == 'modulo' and id_modulo is not None:
+                cursor.execute(sql_insert, (id_rol, id_modulo, None, estado_permiso))
+            elif tipo == 'opcion' and id_modulo is not None and id_opcion is not None:
+                cursor.execute(sql_insert, (id_rol, id_modulo, id_opcion, estado_permiso))
             else:
-                continue  # ignora otros tipos o datos incompletos
+                continue  # ignora datos incompletos
 
         conexion.commit()
     except Exception as e:
         conexion.rollback()
-        print("❌ Error al guardar permisos:", str(e))  # DEBUG opcional
+        print("❌ Error al guardar permisos:", str(e))
         return jsonify({'error': str(e)}), 500
     finally:
         cursor.close()
         conexion.close()
 
     return jsonify({'message': 'Permisos guardados correctamente'})
+
 
 
 
