@@ -430,11 +430,7 @@ def mapa_flotas():
     dni_usuario = get_jwt_identity()
     usuario = controlador_usuarios.obtener_usuario(dni_usuario)
 
-    rutas = controlador_rutas.obtener_rutas_programadas()
-    hoy = date.today()
-
-    # Filtra rutas por fecha actual
-    rutas_hoy = [r for r in rutas if r["fecha"] == hoy]
+    rutas_hoy = controlador_rutas.obtener_rutas_programadas_hoy()
 
     breadcrumbs = [
         {"name": "Inicio", "url": "/index"},
@@ -446,6 +442,7 @@ def mapa_flotas():
         rutas_hoy=rutas_hoy,
         breadcrumbs=breadcrumbs
     )
+
 
 
 
@@ -741,8 +738,97 @@ def obtener_ruta_actual():
         return jsonify({"error": str(e)}), 500
     finally:
         conexion.close()
-
         
+        
+# En tu backend Flask
+@app.route("/api/guardar_trazado_real", methods=["POST"])
+def guardar_trazado_real():
+    data = request.get_json()
+    id_ruta = data.get("id_ruta")
+    coordenadas = data.get("coordenadas", [])
+
+    if not id_ruta or not coordenadas:
+        return jsonify({"success": False, "message": "Datos incompletos"}), 400
+
+    try:
+        conexion = obtener_conexion()
+        with conexion.cursor() as cursor:
+            for punto in coordenadas:
+                cursor.execute("""
+                    INSERT INTO ruta_real_trazada (id_ruta, latitud, longitud, registrado_en)
+                    VALUES (%s, %s, %s, NOW())
+                """, (id_ruta, punto["lat"], punto["lng"]))
+        conexion.commit()
+        return jsonify({"success": True}), 200
+    except Exception as e:
+        return jsonify({"success": False, "message": str(e)}), 500
+    finally:
+        conexion.close()
+
+
+@app.route("/api/estado_ruta_actual", methods=["GET"])
+def estado_ruta_actual():
+    id_ruta = request.args.get("id_ruta")
+    conexion = obtener_conexion()
+    try:
+        with conexion.cursor() as cursor:
+            cursor.execute("""
+                SELECT estado_envio
+                FROM asignacion_ruta_conductor
+                WHERE id_ruta = %s
+            """, (id_ruta,))
+            estado = cursor.fetchone()
+            if estado:
+                return jsonify({"estado": estado[0]})
+            else:
+                return jsonify({"estado": None})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+    finally:
+        conexion.close()
+
+
+
+@app.route('/api/rutas_programadas_hoy', methods=['GET'])
+@jwt_required()
+def obtener_rutas_programadas_hoy():
+    conexion = obtener_conexion()
+    cursor = conexion.cursor()
+
+    try:
+        cursor.execute("""
+            SELECT
+                rp.id,
+                rp.fecha,
+                rp.hora_salida,
+                rp.hora_llegada,
+                rp.duracion,
+                rp.origen_lat,
+                rp.origen_lon,
+                rp.destino_lat,
+                rp.destino_lon,
+                v.placa AS vehiculo,
+                p.nombre_completo AS conductor,
+                arc.id_persona,
+                arc.estado_envio
+            FROM asignacion_ruta_conductor arc
+            JOIN rutas_programadas rp ON arc.id_ruta = rp.id
+            JOIN vehiculos v ON arc.id_vehiculo = v.id
+            LEFT JOIN personas p ON arc.id_persona = p.id
+            WHERE DATE(rp.fecha) = CURDATE()
+              AND arc.estado = 'Activa'
+            ORDER BY rp.hora_salida
+        """)
+        columnas = [col[0] for col in cursor.description]
+        rutas = [dict(zip(columnas, fila)) for fila in cursor.fetchall()]
+        return jsonify({"success": True, "rutas": rutas})
+    except Exception as e:
+        return jsonify({"success": False, "message": str(e)})
+    finally:
+        cursor.close()
+        conexion.close()
+
+      
 
 @app.route("/api/marcar_ruta_activa", methods=["POST"])
 def marcar_ruta_activa():
@@ -986,7 +1072,7 @@ def finalizar_ruta():
 
             cursor.execute("""
                 UPDATE asignacion_ruta_conductor
-                SET estado_envio = 'Finalizada'
+                SET estado_envio = 'vehiculo_finalizado'
                 WHERE id_ruta = %s;
             """, (id_ruta,))
 

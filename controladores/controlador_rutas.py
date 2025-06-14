@@ -216,6 +216,71 @@ def obtener_todos_los_vehiculos_con_estado():
     finally:
         conexion.close()
 
+def obtener_rutas_programadas_hoy():
+    conexion = obtener_conexion()
+    rutas = []
+
+    try:
+        with conexion.cursor() as cursor:
+            cursor.execute("""
+                SELECT 
+                    rp.id,
+                    rp.origen,
+                    rp.origen_lat,
+                    rp.origen_lon,
+                    rp.destino,
+                    rp.destino_lat,
+                    rp.destino_lon,
+                    rp.fecha,
+                    rp.hora_salida,
+                    rp.hora_llegada,
+                    arc.id_persona,
+                    arc.id_vehiculo,
+                    arc.estado_envio,
+                    arc.fecha_asignacion,
+                    arc.asignado_en,
+                    CONCAT(COALESCE(p.nombre, ''), ' ', COALESCE(p.apellido, '')) AS conductor,
+                    CONCAT(v.modelo, ' - ', v.placa) AS vehiculo
+                FROM rutas_programadas rp
+                JOIN asignacion_ruta_conductor arc ON rp.id = arc.id_ruta
+                LEFT JOIN personas p ON arc.id_persona = p.id
+                JOIN vehiculos v ON arc.id_vehiculo = v.id
+                WHERE rp.fecha = CURRENT_DATE
+                ORDER BY rp.fecha ASC;
+            """)
+
+            for row in cursor.fetchall():
+                rutas.append({
+                    "id": row[0],
+                    "origen": row[1],
+                    "origen_lat": float(row[2]) if row[2] else None,
+                    "origen_lon": float(row[3]) if row[3] else None,
+                    "destino": row[4],
+                    "destino_lat": float(row[5]) if row[5] else None,
+                    "destino_lon": float(row[6]) if row[6] else None,
+                    "fecha": row[7],
+                    "hora_salida": row[8],
+                    "hora_llegada": row[9],
+                    "id_persona": row[10],
+                    "id_vehiculo": row[11],
+                    "estado_envio": row[12],
+                    "fecha_asignacion": row[13].strftime('%Y-%m-%d') if row[13] else None,
+                    "asignado_en": row[14].strftime('%H:%M:%S') if row[14] else None,
+                    "conductor": row[15].strip() if row[15] else "Sin asignar",
+                    "vehiculo": row[16],
+                    "duracion": calcular_duracion(row[8], row[9]) if row[9] else None
+                })
+
+            return rutas
+
+    except Exception as e:
+        print("❌ Error en obtener_rutas_programadas_hoy:", e)
+        raise
+    finally:
+        conexion.close()
+
+
+
 
 
 def obtener_rutas_programadas():
