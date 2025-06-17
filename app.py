@@ -1031,15 +1031,17 @@ def finalizar_ruta():
     try:
         data = request.get_json()
         id_ruta = data.get("id_ruta")
-        hora_fin = datetime.now(timezone("America/Lima"))
+        hora_llegada = data.get("hora_llegada")  # 📲 Hora enviada desde frontend
+        km_recorridos = data.get("km_recorridos")  # 📏 Km enviados desde frontend
 
         conexion = obtener_conexion()
         with conexion.cursor() as cursor:
             cursor.execute("""
                 UPDATE rutas_programadas
-                SET hora_llegada = %s
+                SET hora_llegada = %s,
+                    km_recorridos = %s
                 WHERE id = %s;
-            """, (hora_fin, id_ruta))
+            """, (hora_llegada, km_recorridos, id_ruta))
 
             cursor.execute("""
                 UPDATE asignacion_ruta_conductor
@@ -1053,6 +1055,7 @@ def finalizar_ruta():
         return jsonify({"success": False, "message": str(e)}), 500
     finally:
         conexion.close()
+
         
 @app.route("/api/estado_ruta/<int:id_ruta>")
 def estado_ruta(id_ruta):

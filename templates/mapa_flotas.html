@@ -271,10 +271,23 @@
           btn.parentNode.replaceChild(nuevoBtn, btn);
 
           nuevoBtn.addEventListener("click", function () {
+            const horaLlegada = new Date().toISOString();
+
+            // Calcular km recorridos a partir de la ruta roja
+            const kmRecorridos = (rutaAlternativaCoords.length > 1)
+              ? google.maps.geometry.spherical.computeLength(
+                rutaAlternativaCoords.map(p => new google.maps.LatLng(p.lat, p.lng))
+              ) / 1000
+              : 0;
+
             fetch("/api/finalizar_ruta", {
               method: "POST",
               headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({ id_ruta: idActiva })
+              body: JSON.stringify({
+                id_ruta: idActiva,
+                hora_llegada: horaLlegada,
+                km_recorridos: kmRecorridos.toFixed(2)
+              })
             })
               .then(res => res.json())
               .then(data => {
@@ -284,7 +297,8 @@
                   nuevoBtn.classList.remove("btn-danger");
                   nuevoBtn.classList.add("btn-success");
                   alertify.success("🚦 Ruta finalizada correctamente");
-                  // 🧹 Limpiar rutas y marcadores al finalizar
+
+                  // 🧹 Limpiar mapa
                   if (rutaSecundariaPolyline) rutaSecundariaPolyline.setMap(null);
                   if (marcadorMovil) marcadorMovil.setMap(null);
                   if (circuloMovil) circuloMovil.setMap(null);
@@ -292,16 +306,22 @@
                   localStorage.removeItem("coords_recorridas");
                   localStorage.removeItem("ultima_posicion");
 
+                  // 🔽 Ocultar tarjeta de la ruta finalizada
+                  const tarjeta = document.querySelector(`.fleet-box[data-ruta-id="${idActiva}"]`);
+                  if (tarjeta) tarjeta.style.display = "none";
+
                   actualizarContenidoTarjetas();
                 } else {
                   alertify.error("❌ Error al finalizar ruta: " + data.message);
                 }
               })
+
               .catch(err => {
                 console.error("❌ Error al finalizar ruta:", err);
                 alertify.error("❌ Fallo al contactar al servidor");
               });
           });
+
         }
       }
     } else if (distanciaRestante >= 500) {
@@ -437,6 +457,12 @@
   let puntoOrigenInicial = null;
 
   function iniciarMonitoreoTiempoReal(idRuta) {
+    // 🧹 Limpiar datos anteriores
+    localStorage.removeItem("coords_recorridas");
+    localStorage.removeItem("ultima_posicion");
+    rutaAlternativaCoords = [];
+    puntoOrigenInicial = null;
+
     if (intervaloSeguimiento) clearInterval(intervaloSeguimiento);
 
     intervaloSeguimiento = setInterval(() => {
@@ -463,30 +489,10 @@
     }, 2000);
   }
 
+
   let bufferPuntosCrudos = [];
 
   async function procesarUbicacionConSnapInterpolado(nuevaPos) {
-    if (!puntoOrigenInicial) {
-      puntoOrigenInicial = nuevaPos;
-      rutaAlternativaCoords.push(puntoOrigenInicial);
-      const idRuta = localStorage.getItem("ruta_activa");
-      if (idRuta) {
-        fetch("/api/guardar_trazado_real", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            id_ruta: idRuta,
-            coordenadas: puntosInterpolados
-          })
-        }).then(res => res.json())
-          .then(data => {
-            if (!data.success) console.warn("⚠️ No se pudo guardar el trazado:", data.message);
-          })
-          .catch(err => console.error("❌ Error al guardar trazado:", err));
-      }
-
-    }
-
     bufferPuntosCrudos.push(nuevaPos);
 
     const MIN_PUNTOS = 2;
@@ -521,6 +527,13 @@
           lat: p.location.latitude,
           lng: p.location.longitude
         }));
+
+        // ✅ Asegurar que el primer punto válido sea de Snap
+        if (!puntoOrigenInicial && puntosInterpolados.length > 0) {
+          puntoOrigenInicial = puntosInterpolados[0];
+          rutaAlternativaCoords = []; // Limpiar cualquier anterior
+          rutaAlternativaCoords.push(puntoOrigenInicial);
+        }
 
         const puntoFinal = puntosInterpolados[puntosInterpolados.length - 1];
         actualizarDistanciaRestante(puntoFinal);
@@ -567,11 +580,29 @@
         });
 
         ultimaLatLon = puntoFinal;
-        bufferPuntosCrudos = [puntoFinal]; // continuar desde último
+        bufferPuntosCrudos = [puntoFinal]; // reiniciar desde el último
 
-        // ✅ Guardar estado en localStorage
+        // ✅ Guardar en localStorage solo datos válidos
         localStorage.setItem("coords_recorridas", JSON.stringify(rutaAlternativaCoords));
         localStorage.setItem("ultima_posicion", JSON.stringify(ultimaLatLon));
+
+        // ✅ Guardar en base de datos si existe ID de ruta
+        const idRuta = localStorage.getItem("ruta_activa");
+        if (idRuta) {
+          fetch("/api/guardar_trazado_real", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              id_ruta: idRuta,
+              coordenadas: puntosInterpolados
+            })
+          })
+            .then(res => res.json())
+            .then(data => {
+              if (!data.success) console.warn("⚠️ No se pudo guardar el trazado:", data.message);
+            })
+            .catch(err => console.error("❌ Error al guardar trazado:", err));
+        }
       }
     } catch (error) {
       console.error("❌ Error al usar Snap to Roads con interpolación:", error);
@@ -581,50 +612,58 @@
 
 
 
-  function esperarYActualizarRuta(idRuta, box, boton) {
-    if (boton) {
-      boton.className = "btn btn-warning btn-sm";
-      boton.disabled = true;
-      boton.innerHTML = `⏳ Vehículo en espera`;
-    }
 
-    const checkOrigen = setInterval(() => {
-      fetch(`/api/obtener_origen_ruta/${idRuta}`)
-        .then(res => res.json())
-        .then(data => {
-          const origenValido = data.success && data.lat && data.lon;
+function esperarYActualizarRuta(idRuta, box, boton) {
+  // 🔴 LIMPIEZA TOTAL antes de monitoreo
+  localStorage.removeItem("coords_recorridas");
+  localStorage.removeItem("ultima_posicion");
+  rutaAlternativaCoords = [];
+  puntoOrigenInicial = null;
 
-          if (origenValido) {
-            clearInterval(checkOrigen);
-
-            box.dataset.origenLat = data.lat;
-            box.dataset.origenLon = data.lon;
-
-            const origen = { lat: parseFloat(data.lat), lng: parseFloat(data.lon) };
-            const destino = {
-              lat: parseFloat(box.dataset.destinoLat),
-              lng: parseFloat(box.dataset.destinoLon)
-            };
-
-            map.setCenter(origen);
-            trazarRuta(origen, destino);
-            iniciarMonitoreoTiempoReal(idRuta);
-            actualizarContenidoTarjetas();
-
-            if (boton) {
-              boton.className = "btn btn-secondary btn-sm";
-              boton.innerHTML = `🛣️ Vehículo en recorrido`;
-            }
-
-            alertify.success("✅ Vehículo por salir: origen registrado.");
-            marcarTarjetaActiva(idRuta);
-          }
-        })
-        .catch(err => {
-          console.error("❌ Error al obtener origen:", err);
-        });
-    }, 5000);
+  if (boton) {
+    boton.className = "btn btn-warning btn-sm";
+    boton.disabled = true;
+    boton.innerHTML = `⏳ Vehículo en espera`;
   }
+
+  const checkOrigen = setInterval(() => {
+    fetch(`/api/obtener_origen_ruta/${idRuta}`)
+      .then(res => res.json())
+      .then(data => {
+        const origenValido = data.success && data.lat && data.lon;
+
+        if (origenValido) {
+          clearInterval(checkOrigen);
+
+          box.dataset.origenLat = data.lat;
+          box.dataset.origenLon = data.lon;
+
+          const origen = { lat: parseFloat(data.lat), lng: parseFloat(data.lon) };
+          const destino = {
+            lat: parseFloat(box.dataset.destinoLat),
+            lng: parseFloat(box.dataset.destinoLon)
+          };
+
+          map.setCenter(origen);
+          trazarRuta(origen, destino);
+          iniciarMonitoreoTiempoReal(idRuta);
+          actualizarContenidoTarjetas();
+
+          if (boton) {
+            boton.className = "btn btn-secondary btn-sm";
+            boton.innerHTML = `🛣️ Vehículo en recorrido`;
+          }
+
+          alertify.success("✅ Vehículo por salir: origen registrado.");
+          marcarTarjetaActiva(idRuta);
+        }
+      })
+      .catch(err => {
+        console.error("❌ Error al obtener origen:", err);
+      });
+  }, 5000);
+}
+
 
   function actualizarContenidoTarjetas() {
     fetch('/api/rutas_programadas_hoy')
@@ -722,21 +761,36 @@
       }
       box.addEventListener('click', function () {
         const yaSeleccionada = box.classList.contains('active');
+        const rutaSeleccionadaActual = localStorage.getItem("ruta_activa");
 
         if (yaSeleccionada) {
+          // 🔹 Deselecciona ruta activa
           box.classList.remove('active', 'bg-info-subtle');
           localStorage.removeItem("ruta_activa");
 
           directionsRenderer.set('directions', null);
           if (rutaPolyline) rutaPolyline.setVisible(false);
-          if (rutaSecundariaPolyline) rutaSecundariaPolyline.setVisible(false); // 👈 solo ocultar
+          if (rutaSecundariaPolyline) rutaSecundariaPolyline.setVisible(false);
           if (marcadorOrigen) marcadorOrigen.setMap(null);
           if (marcadorDestino) marcadorDestino.setMap(null);
-
           if (marcadorMovil) marcadorMovil.setVisible(false);
           if (circuloMovil) circuloMovil.setVisible(false);
 
+          // 🧹 Limpieza al deseleccionar
+          localStorage.removeItem("coords_recorridas");
+          localStorage.removeItem("ultima_posicion");
+          rutaAlternativaCoords = [];
+          puntoOrigenInicial = null;
+
         } else {
+          // 🔹 Si es diferente a la anterior, limpiar rastro de la anterior
+          if (rutaSeleccionadaActual && rutaSeleccionadaActual !== rutaId) {
+            localStorage.removeItem("coords_recorridas");
+            localStorage.removeItem("ultima_posicion");
+            rutaAlternativaCoords = [];
+            puntoOrigenInicial = null;
+          }
+
           document.querySelectorAll('.fleet-box').forEach(b => b.classList.remove('active', 'bg-info-subtle'));
           box.classList.add('active', 'bg-info-subtle');
           marcarTarjetaActiva(rutaId);
@@ -773,9 +827,10 @@
 
           if (marcadorMovil) marcadorMovil.setVisible(true);
           if (circuloMovil) circuloMovil.setVisible(true);
-          if (rutaSecundariaPolyline) rutaSecundariaPolyline.setVisible(true); // 👈 volver a mostrar
+          if (rutaSecundariaPolyline) rutaSecundariaPolyline.setVisible(true);
         }
       });
+
 
 
     });
@@ -804,12 +859,12 @@
           marcarTarjetaActiva(rutaIdGuardada);
           alertify.success("✅ Origen registrado correctamente.");
 
-          // ✅ Solo si hay ruta activa, restaurar trazado rojo y punto
           const coordsGuardadas = localStorage.getItem("coords_recorridas");
           const ultimaPos = localStorage.getItem("ultima_posicion");
 
-          if (coordsGuardadas) {
+          if (coordsGuardadas && !puntoOrigenInicial) {
             rutaAlternativaCoords = JSON.parse(coordsGuardadas);
+            puntoOrigenInicial = rutaAlternativaCoords[0];  // establecer solo si no había
             rutaSecundariaPolyline = new google.maps.Polyline({
               path: rutaAlternativaCoords,
               strokeColor: '#FF0000',
@@ -819,7 +874,8 @@
             });
           }
 
-          if (ultimaPos) {
+
+          if (ultimaPos && !marcadorMovil && !circuloMovil) {
             const punto = JSON.parse(ultimaPos);
             marcadorMovil = new google.maps.Marker({
               position: punto,
