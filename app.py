@@ -791,42 +791,13 @@ def estado_ruta_actual():
 
 @app.route('/api/rutas_programadas_hoy', methods=['GET'])
 @jwt_required()
-def obtener_rutas_programadas_hoy():
-    conexion = obtener_conexion()
-    cursor = conexion.cursor()
-
+def api_rutas_programadas_hoy():
     try:
-        cursor.execute("""
-            SELECT
-                rp.id,
-                rp.fecha,
-                rp.hora_salida,
-                rp.hora_llegada,
-                rp.duracion,
-                rp.origen_lat,
-                rp.origen_lon,
-                rp.destino_lat,
-                rp.destino_lon,
-                v.placa AS vehiculo,
-                p.nombre_completo AS conductor,
-                arc.id_persona,
-                arc.estado_envio
-            FROM asignacion_ruta_conductor arc
-            JOIN rutas_programadas rp ON arc.id_ruta = rp.id
-            JOIN vehiculos v ON arc.id_vehiculo = v.id
-            LEFT JOIN personas p ON arc.id_persona = p.id
-            WHERE DATE(rp.fecha) = CURDATE()
-              AND arc.estado = 'Activa'
-            ORDER BY rp.hora_salida
-        """)
-        columnas = [col[0] for col in cursor.description]
-        rutas = [dict(zip(columnas, fila)) for fila in cursor.fetchall()]
+        rutas = controlador_rutas.obtener_rutas_programadas_hoy()
         return jsonify({"success": True, "rutas": rutas})
     except Exception as e:
         return jsonify({"success": False, "message": str(e)})
-    finally:
-        cursor.close()
-        conexion.close()
+
 
       
 

@@ -241,11 +241,10 @@ def obtener_rutas_programadas_hoy():
                     arc.asignado_en,
                     CONCAT(COALESCE(p.nombre, ''), ' ', COALESCE(p.apellido, '')) AS conductor,
                     CONCAT(v.modelo, ' - ', v.placa) AS vehiculo
-                FROM rutas_programadas rp
+              FROM rutas_programadas rp
                 JOIN asignacion_ruta_conductor arc ON rp.id = arc.id_ruta
                 LEFT JOIN personas p ON arc.id_persona = p.id
                 JOIN vehiculos v ON arc.id_vehiculo = v.id
-                WHERE rp.fecha = CURRENT_DATE
                 ORDER BY rp.fecha ASC;
             """)
 
@@ -477,11 +476,15 @@ def eliminar_ruta(id_ruta):
                     UPDATE vehiculos SET estado = TRUE WHERE id = %s
                 """, (id_vehiculo,))
 
+            # Eliminar registros de ubicación vinculados a la ruta
+            cursor.execute("DELETE FROM ubicaciones_ruta WHERE id_ruta = %s", (id_ruta,))
+
             # Eliminar asignación
             cursor.execute("DELETE FROM asignacion_ruta_conductor WHERE id_ruta = %s", (id_ruta,))
-            # Eliminar ruta
+
+            # Eliminar la ruta
             cursor.execute("DELETE FROM rutas_programadas WHERE id = %s", (id_ruta,))
-        
+
         conexion.commit()
         return True, "Ruta eliminada correctamente"
     except Exception as e:
@@ -489,6 +492,7 @@ def eliminar_ruta(id_ruta):
         return False, str(e)
     finally:
         conexion.close()
+
 
 
 def editar_ruta(id_ruta, id_persona, id_vehiculo, destino_lat, destino_lon, destino, fecha):
