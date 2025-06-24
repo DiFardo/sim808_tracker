@@ -871,15 +871,17 @@ def obtener_direccion_desde_coordenadas(lat, lon):
     try:
         url = f"https://nominatim.openstreetmap.org/reverse?lat={lat}&lon={lon}&format=json"
         headers = {'User-Agent': 'sim808-tracker'}
-        response = requests.get(url, headers=headers)
+        response = requests.get(url, headers=headers, timeout=5)
         if response.status_code == 200:
             data = response.json()
-            return data.get("display_name", f"Lat: {lat}, Lon: {lon}")
+            address = data.get("address", {})
+            return address.get("suburb") or address.get("city") or address.get("town") or address.get("state") or f"Lat: {lat}, Lon: {lon}"
         else:
             return f"Lat: {lat}, Lon: {lon}"
     except Exception as e:
         print("❌ Error obteniendo dirección:", str(e))
         return f"Lat: {lat}, Lon: {lon}"
+
 
 def formatear_rutas_hora_lima(rutas):
     lima = timezone("America/Lima")
@@ -914,10 +916,8 @@ def registrar_origen_gps():
         hora_str = data.get("hora", "").strip()
 
         if not hora_str:
-            print("❌ El campo 'hora' está vacío o ausente.")
             return jsonify({"error": "Campo 'hora' es obligatorio"}), 400
 
-        print(f"🕒 Hora recibida: {hora_str}")
         if len(hora_str) < 14:
             return jsonify({"error": "Formato de hora incompleto"}), 400
 
@@ -925,16 +925,20 @@ def registrar_origen_gps():
         hora_utc = utc.localize(hora_sim)
         hora_lima = hora_utc.astimezone(timezone("America/Lima"))
 
-    except (TypeError, ValueError) as e:
-        print("❌ Error procesando datos:", str(e))
+    except Exception as e:
+        print("❌ Error procesando datos:", e)
         return jsonify({"error": "Datos inválidos"}), 400
 
-    direccion = obtener_direccion_desde_coordenadas(lat, lon)
-
-    conexion = obtener_conexion()
     try:
+        direccion = obtener_direccion_desde_coordenadas(lat, lon)
+        if not isinstance(direccion, str):
+            direccion = str(direccion)
+        direccion_corta = direccion.strip()[:100]  # MÁXIMO 100 caracteres
+
+        print("📍 Dirección geocodificada:", direccion_corta)
+
+        conexion = obtener_conexion()
         with conexion.cursor() as cursor:
-            # Actualizar datos en rutas_programadas
             cursor.execute("""
                 UPDATE rutas_programadas
                 SET origen = %s,
@@ -942,7 +946,8 @@ def registrar_origen_gps():
                     origen_lon = %s,
                     hora_salida = %s
                 WHERE id = %s;
-            """, (direccion, lat, lon, hora_lima, id_ruta))
+            """, (direccion_corta, lat, lon, hora_lima, id_ruta))
+
             cursor.execute("""
                 UPDATE asignacion_ruta_conductor
                 SET estado_envio = 'vehiculo_iniciado'
@@ -950,19 +955,21 @@ def registrar_origen_gps():
             """, (id_ruta,))
 
         conexion.commit()
-        print(f"✅ Ruta {id_ruta} actualizada y estado_envio marcado como 'vehiculo_iniciado'.")
+        print(f"✅ Origen y estado_envio actualizados para ruta {id_ruta}")
         return jsonify({
             "success": True,
-            "message": "Origen actualizado y estado_envio modificado",
+            "message": "Origen actualizado correctamente",
             "hora_salida": hora_lima.isoformat()
         }), 200
 
     except Exception as e:
         conexion.rollback()
-        print("❌ Error al actualizar en BD:", str(e))
+        print("❌ Error al actualizar en BD:", e)
         return jsonify({"success": False, "message": str(e)}), 500
     finally:
         conexion.close()
+
+
         
 
 
@@ -1011,15 +1018,17 @@ def obtener_origen_ruta(id_ruta):
             """, (id_ruta,))
             fila = cursor.fetchone()
             if not fila:
-                return jsonify({"success": False, "message": "No se encontró origen para esta ruta"}), 404
+                return jsonify({"success": False, "message": "No se encontró la ruta"}), 404
 
             lat, lon = fila
 
         return jsonify({"success": True, "lat": lat, "lon": lon}), 200
 
     except Exception as e:
-        print("❌ Error al obtener origen:", e)
+        print("❌ Error al obtener origen desde rutas_programadas:", e)
         return jsonify({"success": False, "message": str(e)}), 500
+
+
 
     
     
