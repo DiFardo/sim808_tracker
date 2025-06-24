@@ -166,7 +166,7 @@
                 <div class="time">
                   ⏱️ <strong>Duración:</strong> {{ ruta.duracion if ruta.duracion else "No disponible" }}
                 </div>
-
+                <div class="estado-gps text-muted small mt-1"></div>
               </div>
               {% endfor %}
               {% else %}
@@ -609,61 +609,85 @@
     }
   }
 
+  function esperarYActualizarRuta(idRuta, box, boton) {
+    if (box.dataset.origenLat && box.dataset.origenLon) {
+      console.log("🟡 Ya existe origen registrado, se evita nueva espera.");
+      return;
+    }
+
+    // 🔴 LIMPIEZA TOTAL antes de monitoreo
+    localStorage.removeItem("coords_recorridas");
+    localStorage.removeItem("ultima_posicion");
+    rutaAlternativaCoords = [];
+    puntoOrigenInicial = null;
+
+    if (boton) {
+      boton.className = "btn btn-warning btn-sm";
+      boton.disabled = true;
+      boton.innerHTML = `⏳ Vehículo en espera`;
+    }
+    const estadoDiv = box.querySelector(".estado-gps");
+    if (estadoDiv) {
+      estadoDiv.innerHTML = `
+    <div class="d-flex align-items-center gap-2">
+      <div class="spinner-border spinner-border-sm text-primary" role="status">
+        <span class="visually-hidden">Loading...</span>
+      </div>
+      <span>⏳ Esperando coordenadas del vehículo...</span>
+    </div>
+  `;
+      estadoDiv.className = "estado-gps text-muted mt-2";
+    }
 
 
+    const checkOrigen = setInterval(() => {
+      fetch(`/api/obtener_origen_ruta/${idRuta}`)
+        .then(res => res.json())
+        .then(data => {
+          const origenValido = data.success && data.lat && data.lon;
 
+          if (origenValido) {
+            clearInterval(checkOrigen);
 
-function esperarYActualizarRuta(idRuta, box, boton) {
-  // 🔴 LIMPIEZA TOTAL antes de monitoreo
-  localStorage.removeItem("coords_recorridas");
-  localStorage.removeItem("ultima_posicion");
-  rutaAlternativaCoords = [];
-  puntoOrigenInicial = null;
+            box.dataset.origenLat = data.lat;
+            box.dataset.origenLon = data.lon;
 
-  if (boton) {
-    boton.className = "btn btn-warning btn-sm";
-    boton.disabled = true;
-    boton.innerHTML = `⏳ Vehículo en espera`;
-  }
+            const origen = { lat: parseFloat(data.lat), lng: parseFloat(data.lon) };
+            const destino = {
+              lat: parseFloat(box.dataset.destinoLat),
+              lng: parseFloat(box.dataset.destinoLon)
+            };
 
-  const checkOrigen = setInterval(() => {
-    fetch(`/api/obtener_origen_ruta/${idRuta}`)
-      .then(res => res.json())
-      .then(data => {
-        const origenValido = data.success && data.lat && data.lon;
+            map.setCenter(origen);
+            trazarRuta(origen, destino);
+            iniciarMonitoreoTiempoReal(idRuta);
+            actualizarContenidoTarjetas();
 
-        if (origenValido) {
-          clearInterval(checkOrigen);
+            if (boton) {
+              boton.className = "btn btn-secondary btn-sm";
+              boton.innerHTML = `🛣️ Vehículo en recorrido`;
+            }
 
-          box.dataset.origenLat = data.lat;
-          box.dataset.origenLon = data.lon;
+            if (estadoDiv) {
+              estadoDiv.textContent = "✅ Origen registrado, vehículo saliendo...";
+              estadoDiv.className = "estado-gps text-success";
+              setTimeout(() => estadoDiv.textContent = "", 5000);  // Limpiar mensaje tras 5s
+            }
 
-          const origen = { lat: parseFloat(data.lat), lng: parseFloat(data.lon) };
-          const destino = {
-            lat: parseFloat(box.dataset.destinoLat),
-            lng: parseFloat(box.dataset.destinoLon)
-          };
-
-          map.setCenter(origen);
-          trazarRuta(origen, destino);
-          iniciarMonitoreoTiempoReal(idRuta);
-          actualizarContenidoTarjetas();
-
-          if (boton) {
-            boton.className = "btn btn-secondary btn-sm";
-            boton.innerHTML = `🛣️ Vehículo en recorrido`;
+            alertify.success("✅ Vehículo por salir: origen registrado.");
+            marcarTarjetaActiva(idRuta);
           }
-
-          alertify.success("✅ Vehículo por salir: origen registrado.");
-          marcarTarjetaActiva(idRuta);
-        }
-      })
-      .catch(err => {
-        console.error("❌ Error al obtener origen:", err);
-      });
-  }, 5000);
-}
-
+        })
+        .catch(err => {
+          console.error("❌ Error al obtener origen:", err);
+          if (estadoDiv) {
+            estadoDiv.textContent = "❌ Error al obtener coordenadas";
+            estadoDiv.className = "estado-gps text-danger";
+            setTimeout(() => estadoDiv.textContent = "", 5000);
+          }
+        });
+    }, 2000);
+  }
 
   function actualizarContenidoTarjetas() {
     fetch('/api/rutas_programadas_hoy')
@@ -671,6 +695,9 @@ function esperarYActualizarRuta(idRuta, box, boton) {
       .then(data => {
         if (data.success && Array.isArray(data.rutas)) {
           data.rutas.forEach(ruta => {
+            const rutaActiva = localStorage.getItem("ruta_activa");
+            if (ruta.id == rutaActiva) return;  // ⛔ NO actualizar la ruta activa
+
             const card = document.querySelector(`.fleet-box[data-ruta-id="${ruta.id}"]`);
             if (!card) return;
 
@@ -704,6 +731,7 @@ function esperarYActualizarRuta(idRuta, box, boton) {
         }
       });
   }
+
 
   document.addEventListener('DOMContentLoaded', function () {
     const fleetBoxes = document.querySelectorAll('.fleet-box');
@@ -825,11 +853,32 @@ function esperarYActualizarRuta(idRuta, box, boton) {
           trazarRuta(origen, destino);
           iniciarMonitoreoTiempoReal(rutaId);
 
+          // 🔁 VOLVER A MOSTRAR RUTA REAL SI EXISTE EN LOCALSTORAGE
+          const coordsGuardadas = localStorage.getItem("coords_recorridas");
+          if (coordsGuardadas) {
+            rutaAlternativaCoords = JSON.parse(coordsGuardadas);
+            puntoOrigenInicial = rutaAlternativaCoords[0];
+
+            if (!rutaSecundariaPolyline) {
+              rutaSecundariaPolyline = new google.maps.Polyline({
+                path: rutaAlternativaCoords,
+                strokeColor: '#FF0000',
+                strokeOpacity: 0.9,
+                strokeWeight: 4,
+                map: map
+              });
+            } else {
+              rutaSecundariaPolyline.setMap(map);
+              rutaSecundariaPolyline.setPath(rutaAlternativaCoords);
+            }
+          }
+
           if (marcadorMovil) marcadorMovil.setVisible(true);
           if (circuloMovil) circuloMovil.setVisible(true);
           if (rutaSecundariaPolyline) rutaSecundariaPolyline.setVisible(true);
         }
       });
+
 
 
 
