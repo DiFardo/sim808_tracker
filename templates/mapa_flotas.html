@@ -124,10 +124,13 @@
 
               {% if rutas_hoy %}
               {% for ruta in rutas_hoy %}
-              <div class="fleet-box" data-ruta-id="{{ ruta.id }}" data-origen-lat="{{ ruta.origen_lat }}"
-                data-origen-lon="{{ ruta.origen_lon }}" data-destino-lat="{{ ruta.destino_lat }}"
-                data-destino-lon="{{ ruta.destino_lon }}"
+              <div class="fleet-box" data-ruta-id="{{ ruta.id }}"
+                data-origen-lat="{{ ruta.origen_lat if ruta.origen_lat else '' }}"
+                data-origen-lon="{{ ruta.origen_lon if ruta.origen_lon else '' }}"
+                data-destino-lat="{{ ruta.destino_lat if ruta.destino_lat else '' }}"
+                data-destino-lon="{{ ruta.destino_lon if ruta.destino_lon else '' }}"
                 data-conductor-id="{{ ruta.id_persona if ruta.id_persona else '' }}">
+
 
                 {% if ruta.estado_envio == 'vehiculo_iniciar' %}
                 <button class="btn btn-warning btn-sm" disabled>⏳ Vehículo en espera</button>
@@ -153,10 +156,10 @@
                   🚗 <strong>Vehículo:</strong> {{ ruta.vehiculo }}
                 </div>
 
-                <div class="time">
+                <!-- <div class="time">
                   🕓 <strong>Salida:</strong> {{ ruta.hora_salida.strftime('%H:%M') if ruta.hora_salida else "Aún no
                   parte el vehículo" }}
-                </div>
+                </div> -->
 
                 <div class="time">
                   🕗 <strong>Llegada:</strong> {{ ruta.hora_llegada.strftime('%H:%M') if ruta.hora_llegada else "No
@@ -610,12 +613,11 @@
   }
 
   function esperarYActualizarRuta(idRuta, box, boton) {
-    if (box.dataset.origenLat && box.dataset.origenLon) {
+    if ((box.dataset.origenLat && box.dataset.origenLon) || box.dataset.origenRegistrado === "true") {
       console.log("🟡 Ya existe origen registrado, se evita nueva espera.");
       return;
     }
 
-    // 🔴 LIMPIEZA TOTAL antes de monitoreo
     localStorage.removeItem("coords_recorridas");
     localStorage.removeItem("ultima_posicion");
     rutaAlternativaCoords = [];
@@ -626,20 +628,49 @@
       boton.disabled = true;
       boton.innerHTML = `⏳ Vehículo en espera`;
     }
-    const estadoDiv = box.querySelector(".estado-gps");
-    if (estadoDiv) {
-      estadoDiv.innerHTML = `
-    <div class="d-flex align-items-center gap-2">
-      <div class="spinner-border spinner-border-sm text-primary" role="status">
-        <span class="visually-hidden">Loading...</span>
-      </div>
-      <span>⏳ Esperando coordenadas del vehículo...</span>
-    </div>
-  `;
+
+    let estadoDiv = box.querySelector(".estado-gps");
+    if (!estadoDiv) {
+      estadoDiv = document.createElement("div");
       estadoDiv.className = "estado-gps text-muted mt-2";
+      box.appendChild(estadoDiv);
     }
 
+    estadoDiv.style.display = "block";
 
+    // ⏳ MENSAJES PROGRESIVOS CON CANCELACIÓN
+    let mensajePaso = 0;
+    let mensajeInterval = setInterval(() => {
+      if (mensajePaso === 0) {
+        estadoDiv.innerHTML = `
+        <div class="d-flex align-items-center gap-2">
+          <div class="spinner-border spinner-border-sm text-primary" role="status">
+            <span class="visually-hidden">Loading...</span>
+          </div>
+          <span>🚀 Ruta ID detectada por el SIM808...</span>
+        </div>`;
+      } else if (mensajePaso === 1) {
+        estadoDiv.innerHTML = `
+        <div class="d-flex align-items-center gap-2">
+          <div class="spinner-border spinner-border-sm text-primary" role="status">
+            <span class="visually-hidden">Loading...</span>
+          </div>
+          <span>📡 Esperando coordenadas del vehículo...</span>
+        </div>`;
+      } else if (mensajePaso === 2) {
+        estadoDiv.innerHTML = `
+        <div class="d-flex align-items-center gap-2">
+          <div class="spinner-border spinner-border-sm text-primary" role="status">
+            <span class="visually-hidden">Loading...</span>
+          </div>
+          <span>📤 Enviando coordenadas...</span>
+        </div>`;
+      }
+      mensajePaso++;
+      if (mensajePaso > 2) clearInterval(mensajeInterval);
+    }, 5000); // Cada 5 segundos un nuevo mensaje
+
+    // 🛰️ CHECKEO DEL ORIGEN
     const checkOrigen = setInterval(() => {
       fetch(`/api/obtener_origen_ruta/${idRuta}`)
         .then(res => res.json())
@@ -648,9 +679,11 @@
 
           if (origenValido) {
             clearInterval(checkOrigen);
+            clearInterval(mensajeInterval); // 🔴 DETENER SPINNER SECUENCIA
 
             box.dataset.origenLat = data.lat;
             box.dataset.origenLon = data.lon;
+            box.dataset.origenRegistrado = "true";
 
             const origen = { lat: parseFloat(data.lat), lng: parseFloat(data.lon) };
             const destino = {
@@ -668,23 +701,30 @@
               boton.innerHTML = `🛣️ Vehículo en recorrido`;
             }
 
-            if (estadoDiv) {
-              estadoDiv.textContent = "✅ Origen registrado, vehículo saliendo...";
-              estadoDiv.className = "estado-gps text-success";
-              setTimeout(() => estadoDiv.textContent = "", 5000);  // Limpiar mensaje tras 5s
+            estadoDiv.innerHTML = `<span class="text-success">✅ Origen registrado, vehículo saliendo...</span>`;
+            estadoDiv.className = "estado-gps text-success";
+
+            setTimeout(() => {
+              estadoDiv.innerHTML = "";
+            }, 5000);
+
+            if (!box.dataset.alertMostrada) {
+              alertify.success("✅ Vehículo por salir: origen registrado.");
+              box.dataset.alertMostrada = "true";
             }
 
-            alertify.success("✅ Vehículo por salir: origen registrado.");
             marcarTarjetaActiva(idRuta);
           }
         })
         .catch(err => {
           console.error("❌ Error al obtener origen:", err);
-          if (estadoDiv) {
-            estadoDiv.textContent = "❌ Error al obtener coordenadas";
-            estadoDiv.className = "estado-gps text-danger";
-            setTimeout(() => estadoDiv.textContent = "", 5000);
-          }
+          clearInterval(mensajeInterval); // detener también en error
+          estadoDiv.innerHTML = `<span class="text-danger">❌ Error al obtener coordenadas</span>`;
+          estadoDiv.className = "estado-gps text-danger";
+
+          setTimeout(() => {
+            estadoDiv.innerHTML = "";
+          }, 5000);
         });
     }, 2000);
   }
