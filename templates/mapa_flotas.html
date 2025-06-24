@@ -643,32 +643,32 @@
     let mensajeInterval = setInterval(() => {
       if (mensajePaso === 0) {
         estadoDiv.innerHTML = `
-        <div class="d-flex align-items-center gap-2">
-          <div class="spinner-border spinner-border-sm text-primary" role="status">
-            <span class="visually-hidden">Loading...</span>
-          </div>
-          <span>🚀 Ruta ID detectada por el SIM808...</span>
-        </div>`;
+      <div class="d-flex align-items-center gap-2">
+        <div class="spinner-border spinner-border-sm text-primary" role="status">
+          <span class="visually-hidden">Loading...</span>
+        </div>
+        <span>🚀 Ruta ID detectada por el SIM808...</span>
+      </div>`;
       } else if (mensajePaso === 1) {
         estadoDiv.innerHTML = `
-        <div class="d-flex align-items-center gap-2">
-          <div class="spinner-border spinner-border-sm text-primary" role="status">
-            <span class="visually-hidden">Loading...</span>
-          </div>
-          <span>📡 Esperando coordenadas del vehículo...</span>
-        </div>`;
+      <div class="d-flex align-items-center gap-2">
+        <div class="spinner-border spinner-border-sm text-primary" role="status">
+          <span class="visually-hidden">Loading...</span>
+        </div>
+        <span>📡 Esperando coordenadas del vehículo...</span>
+      </div>`;
       } else if (mensajePaso === 2) {
         estadoDiv.innerHTML = `
-        <div class="d-flex align-items-center gap-2">
-          <div class="spinner-border spinner-border-sm text-primary" role="status">
-            <span class="visually-hidden">Loading...</span>
-          </div>
-          <span>📤 Enviando coordenadas...</span>
-        </div>`;
+      <div class="d-flex align-items-center gap-2">
+        <div class="spinner-border spinner-border-sm text-primary" role="status">
+          <span class="visually-hidden">Loading...</span>
+        </div>
+        <span>📤 Enviando coordenadas...</span>
+      </div>`;
       }
       mensajePaso++;
       if (mensajePaso > 2) clearInterval(mensajeInterval);
-    }, 5000); // Cada 5 segundos un nuevo mensaje
+    }, 5000);
 
     // 🛰️ CHECKEO DEL ORIGEN
     const checkOrigen = setInterval(() => {
@@ -679,7 +679,7 @@
 
           if (origenValido) {
             clearInterval(checkOrigen);
-            clearInterval(mensajeInterval); // 🔴 DETENER SPINNER SECUENCIA
+            clearInterval(mensajeInterval); // 🔴 DETENER MENSAJES
 
             box.dataset.origenLat = data.lat;
             box.dataset.origenLon = data.lon;
@@ -718,7 +718,7 @@
         })
         .catch(err => {
           console.error("❌ Error al obtener origen:", err);
-          clearInterval(mensajeInterval); // detener también en error
+          clearInterval(mensajeInterval);
           estadoDiv.innerHTML = `<span class="text-danger">❌ Error al obtener coordenadas</span>`;
           estadoDiv.className = "estado-gps text-danger";
 
@@ -736,7 +736,7 @@
         if (data.success && Array.isArray(data.rutas)) {
           data.rutas.forEach(ruta => {
             const rutaActiva = localStorage.getItem("ruta_activa");
-            if (ruta.id == rutaActiva) return;  // ⛔ NO actualizar la ruta activa
+            if (ruta.id == rutaActiva) return;
 
             const card = document.querySelector(`.fleet-box[data-ruta-id="${ruta.id}"]`);
             if (!card) return;
@@ -762,6 +762,12 @@
               btn.className = "btn btn-secondary btn-sm";
               btn.disabled = true;
               btn.innerHTML = `🛣️ Vehículo en recorrido`;
+
+              // 🧹 Limpiar estado-gps si existe
+              const estadoDiv = card.querySelector(".estado-gps");
+              if (estadoDiv) {
+                estadoDiv.innerHTML = "";
+              }
             } else {
               btn.className = "btn btn-primary btn-sm btn-iniciar-ruta";
               btn.disabled = false;
@@ -771,6 +777,7 @@
         }
       });
   }
+
 
 
   document.addEventListener('DOMContentLoaded', function () {

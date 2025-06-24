@@ -1005,24 +1005,22 @@ def obtener_origen_ruta(id_ruta):
         conexion = obtener_conexion()
         with conexion.cursor() as cursor:
             cursor.execute("""
-                SELECT lat, lon, hora
-                FROM ubicaciones_ruta
-                WHERE id_ruta = %s
-                ORDER BY hora ASC
-                LIMIT 1;
+                SELECT origen_lat, origen_lon
+                FROM rutas_programadas
+                WHERE id = %s;
             """, (id_ruta,))
             fila = cursor.fetchone()
             if not fila:
                 return jsonify({"success": False, "message": "No se encontró origen para esta ruta"}), 404
-            
-            lat, lon, hora = fila
-            hora_str = hora.strftime("%Y%m%d%H%M%S")
 
-        return jsonify({"success": True, "lat": lat, "lon": lon, "hora": hora_str}), 200
+            lat, lon = fila
+
+        return jsonify({"success": True, "lat": lat, "lon": lon}), 200
 
     except Exception as e:
         print("❌ Error al obtener origen:", e)
         return jsonify({"success": False, "message": str(e)}), 500
+
     
     
 
