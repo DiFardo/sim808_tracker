@@ -725,11 +725,14 @@
             }
 
             estadoDiv.innerHTML = `<span class="text-success">✅ Origen registrado, vehículo saliendo...</span>`;
-            estadoDiv.className = "estado-gps text-success";
+            estadoDiv.classList.remove("text-danger");
+            estadoDiv.classList.add("text-success");
 
             setTimeout(() => {
               estadoDiv.innerHTML = "";
+              estadoDiv.style.display = "none"; // ✅ También ocúltalo completamente
             }, 5000);
+
 
             if (!box.dataset.alertMostrada) {
               alertify.success("✅ Vehículo por salir: origen registrado.");
@@ -742,8 +745,15 @@
         .catch(err => {
           console.error("❌ Error al obtener origen:", err);
           clearInterval(mensajeInterval);
-          estadoDiv.innerHTML = `<span class="text-danger">❌ Error al obtener coordenadas</span>`;
-          estadoDiv.className = "estado-gps text-danger";
+          if (box.dataset.origenLat && box.dataset.origenLon) {
+            console.warn("⚠️ Ya hay origen, no se muestra mensaje de error.");
+            estadoDiv.innerHTML = "";
+            estadoDiv.style.display = "none";
+          } else {
+            estadoDiv.innerHTML = `<span class="text-danger">❌ Error al obtener coordenadas</span>`;
+            estadoDiv.className = "estado-gps text-danger";
+          }
+
 
           setTimeout(() => {
             estadoDiv.innerHTML = "";
@@ -790,6 +800,7 @@
               const estadoDiv = card.querySelector(".estado-gps");
               if (estadoDiv) {
                 estadoDiv.innerHTML = "";
+                estadoDiv.style.display = "none";
               }
             } else {
               btn.className = "btn btn-primary btn-sm btn-iniciar-ruta";
