@@ -131,6 +131,14 @@
                 data-destino-lon="{{ ruta.destino_lon if ruta.destino_lon else '' }}"
                 data-conductor-id="{{ ruta.id_persona if ruta.id_persona else '' }}">
 
+                {% if ruta.estado_envio is none and ruta.id_persona %}
+                <button class="btn btn-outline-success btn-sm btn-iniciar-gps" data-id-ruta="{{ ruta.id }}">
+                  ▶️ Iniciar Ruta
+                </button>
+                {% endif %}
+
+
+
 
                 {% if ruta.estado_envio == 'vehiculo_iniciar' %}
                 <button class="btn btn-warning btn-sm" disabled>⏳ Vehículo en espera</button>
@@ -1012,6 +1020,187 @@
 
 
 </script>
+
+<script>
+  document.querySelectorAll(".btn-iniciar-gps").forEach(btn => {
+    btn.addEventListener("click", function () {
+      const idRuta = this.dataset.idRuta;
+      const box = this.closest(".fleet-box");
+      const estadoDiv = box.querySelector(".estado-gps");
+      const btn = this;
+
+      // Estado visual inicial
+      btn.disabled = true;
+      btn.classList.remove("btn-outline-success");
+      btn.classList.add("btn-warning");
+      btn.innerHTML = `<i class='fas fa-spinner fa-spin'></i> Enviando solicitud...`;
+
+      // Paso 1: marcar la ruta como activa
+      fetch("/api/marcar_ruta_activa", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id_ruta: idRuta })
+      })
+        .then(res => res.json())
+        .then(data => {
+          if (!data.success) {
+            alertify.error("❌ No se pudo activar la ruta");
+            btn.disabled = false;
+            btn.className = "btn btn-outline-success btn-sm";
+            btn.innerHTML = `▶️ Iniciar Ruta`;
+            return;
+          }
+
+          // Simulación progresiva de espera tipo SIM808
+          let paso = 0;
+          const totalPasos = 3;
+          const simularIntervalo = setInterval(() => {
+            paso++;
+            if (estadoDiv) {
+              if (paso === 1) {
+                estadoDiv.innerHTML = `<div class="text-muted">🚀 Ruta activada. Esperando señal GPS...</div>`;
+              } else if (paso === 2) {
+                estadoDiv.innerHTML = `
+                  <div class="d-flex align-items-center gap-2">
+                    <div class="spinner-border spinner-border-sm text-primary" role="status"></div>
+                    <span>📡 Buscando señal GPS del vehículo...</span>
+                  </div>`;
+              } else if (paso === 3) {
+                estadoDiv.innerHTML = `
+                  <div class="d-flex align-items-center gap-2">
+                    <div class="spinner-border spinner-border-sm text-primary" role="status"></div>
+                    <span>📍 Registrando coordenadas de origen...</span>
+                  </div>`;
+              }
+            }
+
+            if (paso >= totalPasos) {
+              clearInterval(simularIntervalo);
+
+              // Paso final: capturar ubicación actual
+              if (!navigator.geolocation) {
+                alertify.error("❌ Tu navegador no permite geolocalización");
+                btn.disabled = false;
+                return;
+              }
+
+              navigator.geolocation.getCurrentPosition(pos => {
+                const lat = pos.coords.latitude;
+                const lon = pos.coords.longitude;
+
+                // Formato de hora requerido por el backend
+                const ahora = new Date();
+                const yyyy = ahora.getUTCFullYear();
+                const MM = String(ahora.getUTCMonth() + 1).padStart(2, '0');
+                const dd = String(ahora.getUTCDate()).padStart(2, '0');
+                const hh = String(ahora.getUTCHours()).padStart(2, '0');
+                const mm = String(ahora.getUTCMinutes()).padStart(2, '0');
+                const ss = String(ahora.getUTCSeconds()).padStart(2, '0');
+                const horaUTC = `${yyyy}${MM}${dd}${hh}${mm}${ss}`;
+
+                fetch("/api/registrar_origen_gps", {
+                  method: "POST",
+                  headers: { "Content-Type": "application/json" },
+                  body: JSON.stringify({ id_ruta: idRuta, lat: lat, lon: lon, hora: horaUTC })
+                })
+                  .then(res => res.json())
+                  .then(data2 => {
+                    if (!data2.success) {
+                      alertify.error("❌ No se pudo registrar el origen");
+                      return;
+                    }
+
+                    // Mostrar origen, destino y trazar ruta azul
+                    const origen = { lat, lng: lon };
+                    const destino = {
+                      lat: parseFloat(box.dataset.destinoLat),
+                      lng: parseFloat(box.dataset.destinoLon)
+                    };
+
+                    box.dataset.origenLat = lat;
+                    box.dataset.origenLon = lon;
+                    box.dataset.origenRegistrado = "true";
+
+                    trazarRuta(origen, destino);
+                    map.setCenter(origen);
+
+                    if (estadoDiv) {
+                      estadoDiv.innerHTML = `<span class="text-success">✅ Origen registrado correctamente</span>`;
+                    }
+
+                    alertify.success("📍 Origen registrado y ruta trazada");
+
+                    // Simular transición final a "vehículo en recorrido"
+                    setTimeout(() => {
+                      btn.className = "btn btn-secondary btn-sm";
+                      btn.innerHTML = `🛣️ Vehículo en recorrido`;
+
+                      iniciarMonitoreoTiempoReal(idRuta);
+                      marcarTarjetaActiva(idRuta);
+                    }, 2000);
+                  });
+              }, err => {
+                console.error("❌ Error al obtener ubicación:", err);
+                alertify.error("❌ Falló la geolocalización del dispositivo");
+              });
+            }
+          }, 4000); // total: 12 segundos de espera simulada
+        });
+    });
+  });
+
+  function iniciarMonitoreoTiempoReal(idRuta) {
+    bufferPuntosCrudos = [];
+    rutaAlternativaCoords = [];
+    puntoOrigenInicial = null;
+    ultimaLat = null;
+    ultimaLon = null;
+    alertaLlegadaMostrada = false;
+
+    if (intervaloSeguimiento) clearInterval(intervaloSeguimiento);
+
+    if (navigator.geolocation) {
+      const watchId = navigator.geolocation.watchPosition(pos => {
+        const nuevaLat = pos.coords.latitude;
+        const nuevaLon = pos.coords.longitude;
+
+        if (nuevaLat === ultimaLat && nuevaLon === ultimaLon) return;
+
+        ultimaLat = nuevaLat;
+        ultimaLon = nuevaLon;
+
+        const nuevaPos = { lat: nuevaLat, lng: nuevaLon };
+        procesarUbicacionConSnapInterpolado(nuevaPos); // ya lo usas
+
+        // Registrar en BD
+        const ahora = new Date().toISOString();
+        fetch("/api/ubicaciones_ruta", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            id_ruta: idRuta,
+            lat: nuevaLat,
+            lon: nuevaLon,
+            hora: ahora
+          })
+        });
+      }, err => {
+        console.error("❌ Error en seguimiento:", err);
+      }, {
+        enableHighAccuracy: true,
+        maximumAge: 2000,
+        timeout: 10000
+      });
+
+      window._gpsWatchId = watchId;
+    } else {
+      alertify.error("❌ Geolocalización no disponible");
+    }
+  }
+
+</script>
+
+
 
 
 

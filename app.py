@@ -799,7 +799,31 @@ def api_rutas_programadas_hoy():
         return jsonify({"success": False, "message": str(e)})
 
 
-      
+@app.route("/api/ubicaciones_ruta", methods=["POST"])
+def registrar_ubicacion_ruta():
+    try:
+        data = request.get_json()
+        id_ruta = data.get("id_ruta")
+        lat = data.get("lat")
+        lon = data.get("lon")
+
+        if not all([id_ruta, lat, lon]):
+            return jsonify({"success": False, "message": "Faltan datos"}), 400
+
+        conexion = obtener_conexion()
+        with conexion.cursor() as cursor:
+            cursor.execute("""
+                INSERT INTO ubicaciones_ruta (id_ruta, lat, lon)
+                VALUES (%s, %s, %s)
+            """, (id_ruta, lat, lon))
+        conexion.commit()
+        return jsonify({"success": True}), 200
+
+    except Exception as e:
+        print("❌ Error al registrar ubicación:", e)
+        return jsonify({"success": False, "message": str(e)}), 500
+
+
 
 @app.route("/api/marcar_ruta_activa", methods=["POST"])
 def marcar_ruta_activa():
