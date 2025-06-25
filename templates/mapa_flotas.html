@@ -131,27 +131,22 @@
                 data-destino-lon="{{ ruta.destino_lon if ruta.destino_lon else '' }}"
                 data-conductor-id="{{ ruta.id_persona if ruta.id_persona else '' }}">
 
-                {% if ruta.estado_envio is none and ruta.id_persona %}
+                {% set estado = ruta.estado_envio %}
+                {% set asignado = ruta.id_persona is not none %}
+
+                {% if asignado %}
+                {% if estado is none %}
                 <button class="btn btn-outline-success btn-sm btn-iniciar-gps" data-id-ruta="{{ ruta.id }}">
                   ▶️ Iniciar Ruta
                 </button>
-                {% endif %}
-
-
-
-
-                {% if ruta.estado_envio == 'vehiculo_iniciar' %}
+                {% elif estado == 'vehiculo_iniciar' %}
                 <button class="btn btn-warning btn-sm" disabled>⏳ Vehículo en espera</button>
-                {% elif ruta.estado_envio == 'vehiculo_iniciado' or ruta.hora_salida %}
+                {% elif estado == 'vehiculo_iniciado' or ruta.hora_salida %}
                 <button class="btn btn-secondary btn-sm" disabled>🛣️ Vehículo en recorrido</button>
-                {% elif ruta.estado_envio == 'vehiculo_finalizado' %}
+                {% elif estado == 'vehiculo_finalizado' %}
                 <button class="btn btn-success btn-sm" disabled>✅ Ruta finalizada</button>
-                {% else %}
-                {% if ruta.id_persona %}
-                <button class="btn btn-primary btn-sm btn-iniciar-ruta" data-id-ruta="{{ ruta.id }}">
-                  ▶️ Iniciar Ruta
-                </button>
                 {% endif %}
+
                 {% endif %}
                 <div class="fleet-title">
                   {{ ruta.conductor if ruta.conductor else "Conductor: No asignado" }}
@@ -265,7 +260,7 @@
     const idActiva = localStorage.getItem("ruta_activa");
 
     // ✅ Mostrar alerta y botón si está cerca del destino
-    if (distanciaRestante < 500 && !alertaLlegadaMostrada) {
+    if (distanciaRestante < 100 && !alertaLlegadaMostrada) {
       alertaLlegadaMostrada = true;
       alertify.success("📍 Estás por llegar al destino.");
 
@@ -510,12 +505,24 @@
     const MAX_PUNTOS = 10;
 
     if (bufferPuntosCrudos.length > MAX_PUNTOS) {
-      bufferPuntosCrudos.shift(); // elimina el más antiguo
+      bufferPuntosCrudos.shift();
+    }
+
+    // Mostrar primer punto si aún no hay trazado
+    if (rutaAlternativaCoords.length === 0 && bufferPuntosCrudos.length === 1) {
+      rutaAlternativaCoords.push(nuevaPos);
+      rutaSecundariaPolyline = new google.maps.Polyline({
+        path: rutaAlternativaCoords,
+        strokeColor: '#FF0000',
+        strokeOpacity: 0.9,
+        strokeWeight: 4,
+        map: map
+      });
     }
 
     if (bufferPuntosCrudos.length < MIN_PUNTOS) return;
 
-    // Verificar si todos los puntos son iguales (no moverse)
+    // Verificar si no te has movido
     const todosIguales = bufferPuntosCrudos.every((p, i, arr) => {
       if (i === 0) return true;
       const anterior = arr[i - 1];
@@ -533,37 +540,38 @@
       const response = await fetch(`https://roads.googleapis.com/v1/snapToRoads?path=${pathParam}&interpolate=true&key=AIzaSyAABGMtrjdoukcZT2XUBLbtLLgeLRxuZHo`);
       const data = await response.json();
 
-      if (data.snappedPoints && data.snappedPoints.length > 0) {
-        const puntosInterpolados = data.snappedPoints.map(p => ({
-          lat: p.location.latitude,
-          lng: p.location.longitude
-        }));
+      if (!data.snappedPoints || data.snappedPoints.length === 0) return;
 
-        // ✅ Asegurar que el primer punto válido sea de Snap
-        if (!puntoOrigenInicial && puntosInterpolados.length > 0) {
-          puntoOrigenInicial = puntosInterpolados[0];
-          rutaAlternativaCoords = []; // Limpiar cualquier anterior
-          rutaAlternativaCoords.push(puntoOrigenInicial);
-        }
+      const puntosInterpolados = data.snappedPoints.map(p => ({
+        lat: p.location.latitude,
+        lng: p.location.longitude
+      }));
 
-        const puntoFinal = puntosInterpolados[puntosInterpolados.length - 1];
-        actualizarDistanciaRestante(puntoFinal);
+      // Primer punto del recorrido real
+      if (!puntoOrigenInicial) {
+        puntoOrigenInicial = puntosInterpolados[0];
+        rutaAlternativaCoords = [puntoOrigenInicial];
+      }
 
-        rutaAlternativaCoords.push(...puntosInterpolados);
+      const puntoFinal = puntosInterpolados[puntosInterpolados.length - 1];
+      actualizarDistanciaRestante(puntoFinal);
 
-        if (!rutaSecundariaPolyline) {
-          rutaSecundariaPolyline = new google.maps.Polyline({
-            path: rutaAlternativaCoords,
-            strokeColor: '#FF0000',
-            strokeOpacity: 0.9,
-            strokeWeight: 4,
-            map: map
-          });
-        } else {
-          rutaSecundariaPolyline.setPath(rutaAlternativaCoords);
-        }
+      rutaAlternativaCoords.push(...puntosInterpolados);
 
-        if (marcadorMovil) marcadorMovil.setMap(null);
+      if (!rutaSecundariaPolyline) {
+        rutaSecundariaPolyline = new google.maps.Polyline({
+          path: rutaAlternativaCoords,
+          strokeColor: '#FF0000',
+          strokeOpacity: 0.9,
+          strokeWeight: 4,
+          map: map
+        });
+      } else {
+        rutaSecundariaPolyline.setPath(rutaAlternativaCoords);
+      }
+
+      // Marcador móvil reutilizable
+      if (!marcadorMovil) {
         marcadorMovil = new google.maps.Marker({
           position: puntoFinal,
           map: map,
@@ -577,8 +585,12 @@
           },
           title: "Ubicación del vehículo"
         });
+      } else {
+        marcadorMovil.setPosition(puntoFinal);
+      }
 
-        if (circuloMovil) circuloMovil.setMap(null);
+      // Círculo de precisión reutilizable
+      if (!circuloMovil) {
         circuloMovil = new google.maps.Circle({
           strokeColor: "#4285F4",
           strokeOpacity: 0.5,
@@ -589,36 +601,39 @@
           center: puntoFinal,
           radius: 10
         });
+      } else {
+        circuloMovil.setCenter(puntoFinal);
+      }
 
-        ultimaLatLon = puntoFinal;
-        bufferPuntosCrudos = [puntoFinal]; // reiniciar desde el último
+      ultimaLatLon = puntoFinal;
+      bufferPuntosCrudos = [puntoFinal];
 
-        // ✅ Guardar en localStorage solo datos válidos
-        localStorage.setItem("coords_recorridas", JSON.stringify(rutaAlternativaCoords));
-        localStorage.setItem("ultima_posicion", JSON.stringify(ultimaLatLon));
+      // Guardar en localStorage
+      localStorage.setItem("coords_recorridas", JSON.stringify(rutaAlternativaCoords));
+      localStorage.setItem("ultima_posicion", JSON.stringify(ultimaLatLon));
 
-        // ✅ Guardar en base de datos si existe ID de ruta
-        const idRuta = localStorage.getItem("ruta_activa");
-        if (idRuta) {
-          fetch("/api/guardar_trazado_real", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              id_ruta: idRuta,
-              coordenadas: puntosInterpolados
-            })
+      // Guardar en base de datos
+      const idRuta = localStorage.getItem("ruta_activa");
+      if (idRuta) {
+        fetch("/api/guardar_trazado_real", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            id_ruta: idRuta,
+            coordenadas: puntosInterpolados
           })
-            .then(res => res.json())
-            .then(data => {
-              if (!data.success) console.warn("⚠️ No se pudo guardar el trazado:", data.message);
-            })
-            .catch(err => console.error("❌ Error al guardar trazado:", err));
-        }
+        })
+          .then(res => res.json())
+          .then(data => {
+            if (!data.success) console.warn("⚠️ No se pudo guardar el trazado:", data.message);
+          })
+          .catch(err => console.error("❌ Error al guardar trazado:", err));
       }
     } catch (error) {
       console.error("❌ Error al usar Snap to Roads con interpolación:", error);
     }
   }
+
 
   function esperarYActualizarRuta(idRuta, box, boton) {
     if ((box.dataset.origenLat && box.dataset.origenLon) || box.dataset.origenRegistrado === "true") {
@@ -1157,46 +1172,51 @@
     ultimaLon = null;
     alertaLlegadaMostrada = false;
 
-    if (intervaloSeguimiento) clearInterval(intervaloSeguimiento);
-
-    if (navigator.geolocation) {
-      const watchId = navigator.geolocation.watchPosition(pos => {
-        const nuevaLat = pos.coords.latitude;
-        const nuevaLon = pos.coords.longitude;
-
-        if (nuevaLat === ultimaLat && nuevaLon === ultimaLon) return;
-
-        ultimaLat = nuevaLat;
-        ultimaLon = nuevaLon;
-
-        const nuevaPos = { lat: nuevaLat, lng: nuevaLon };
-        procesarUbicacionConSnapInterpolado(nuevaPos); // ya lo usas
-
-        // Registrar en BD
-        const ahora = new Date().toISOString();
-        fetch("/api/ubicaciones_ruta", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            id_ruta: idRuta,
-            lat: nuevaLat,
-            lon: nuevaLon,
-            hora: ahora
-          })
-        });
-      }, err => {
-        console.error("❌ Error en seguimiento:", err);
-      }, {
-        enableHighAccuracy: true,
-        maximumAge: 2000,
-        timeout: 10000
-      });
-
-      window._gpsWatchId = watchId;
-    } else {
-      alertify.error("❌ Geolocalización no disponible");
+    if (gpsWatchId !== null) {
+      console.log("🟡 Monitoreo ya iniciado con watchId:", gpsWatchId);
+      return;
     }
+
+    if (!navigator.geolocation) {
+      alertify.error("❌ Geolocalización no disponible");
+      return;
+    }
+
+    gpsWatchId = navigator.geolocation.watchPosition(pos => {
+      const nuevaLat = pos.coords.latitude;
+      const nuevaLon = pos.coords.longitude;
+
+      if (nuevaLat === ultimaLat && nuevaLon === ultimaLon) return;
+
+      ultimaLat = nuevaLat;
+      ultimaLon = nuevaLon;
+
+      const nuevaPos = { lat: nuevaLat, lng: nuevaLon };
+      procesarUbicacionConSnapInterpolado(nuevaPos); // ya lo usas
+
+      // Registrar en BD
+      const ahora = new Date().toISOString();
+      fetch("/api/ubicaciones_ruta", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          id_ruta: idRuta,
+          lat: nuevaLat,
+          lon: nuevaLon,
+          hora: ahora
+        })
+      });
+    }, err => {
+      console.error("❌ Error en seguimiento:", err);
+    }, {
+      enableHighAccuracy: true,
+      maximumAge: 2000,
+      timeout: 10000
+    });
+
+    console.log("✅ Seguimiento iniciado. watchId:", gpsWatchId);
   }
+
 
 </script>
 
