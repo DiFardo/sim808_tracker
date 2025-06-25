@@ -825,6 +825,8 @@ def registrar_ubicacion_ruta():
 
 
 
+
+
 @app.route("/api/marcar_ruta_activa", methods=["POST"])
 def marcar_ruta_activa():
     try:
