@@ -157,4 +157,17 @@
     </div>
   </div>
 </body>
+<script>
+  const rolNombre = "{{ session['rol'] | safe }}";
+  const rolId = "{{ session['rol_id'] | safe }}";
+
+  if (rolNombre && rolNombre !== 'None') {
+    localStorage.setItem("rol_usuario", rolNombre);
+    localStorage.setItem("rol_id", rolId);
+    console.log("✅ Rol guardado en localStorage:", rolNombre, "(ID:", rolId, ")");
+  }
+</script>
+
+
+
 </html>

@@ -16,6 +16,8 @@ from bd_conexion import obtener_conexion
 import requests
 from datetime import datetime
 from datetime import date
+from flask import session
+
 import serial
 
 from pytz import timezone, utc
@@ -83,22 +85,38 @@ def procesar_login():
         password = request.form["password"].strip()
 
         usuario = controlador_usuarios.obtener_usuario(dni_usuario)
+
         if not usuario:
-            
+            flash("Usuario no encontrado.")
             return redirect("/login_user")
 
-        hash_guardado = usuario[2]  # campo `pass`
+        # ✅ Usa claves del DictCursor correctamente
+        hash_guardado = usuario["pass"]
+        id_persona    = usuario["persona_id"]
+        rol_nombre    = usuario["rol_nombre"]
+        rol_id        = usuario["rol_id"]
+
         if check_password_hash(hash_guardado, password):
+            # ✅ Guarda info relevante en sesión
+            session['rol']         = rol_nombre
+            session['rol_id']      = rol_id
+            session['dni_usuario'] = dni_usuario
+            session['id_persona']  = id_persona
+
             access_token = create_access_token(identity=dni_usuario)
             resp = make_response(redirect("/index"))
             set_access_cookies(resp, access_token)
+
             return resp
         else:
             flash("Contraseña incorrecta.")
             return redirect("/login_user")
+
     except Exception as e:
         flash(f"Ocurrió un error: {str(e)}")
         return redirect("/login_user")
+
+
 
 
 @app.route("/procesar_logout")
@@ -494,11 +512,12 @@ def api_asignar_conductor():
     except Exception as e:
         return jsonify({"success": False, "message": f"Error: {str(e)}"}), 500
 
-@app.route("/api/editar_ruta", methods=["PUT"])
+@app.route("/api/editar_ruta", methods=["POST"])
 @jwt_required()
 def api_editar_ruta():
     try:
-        data = request.form or request.json
+        data = request.form
+
         id_ruta = int(data.get("ruta_id"))
         id_vehiculo = int(data.get("vehiculo"))
         destino = data.get("destino")
@@ -510,13 +529,20 @@ def api_editar_ruta():
 
         lat, lon = map(str.strip, destino_coords.split(","))
 
+        puntos_importantes = None
+        puntos_json = data.get("puntos_importantes")
+        if puntos_json:
+            import json
+            puntos_importantes = json.loads(puntos_json)
+
         success, msg = controlador_rutas.editar_ruta_programada(
             id_ruta=id_ruta,
             id_vehiculo=id_vehiculo,
             destino_lat=lat,
             destino_lon=lon,
             destino=destino,
-            fecha=fecha
+            fecha=fecha,
+            puntos_importantes=puntos_importantes  # ✅ Si tu lógica usa puntos
         )
 
         if success:
@@ -531,7 +557,8 @@ def api_editar_ruta():
                     "lat": lat,
                     "lon": lon,
                     "vehiculo": f"{vehiculo['modelo']} - {vehiculo['placa']}" if vehiculo else "N/D",
-                    "vehiculo_id": id_vehiculo
+                    "vehiculo_id": id_vehiculo,
+                    "puntos_importantes": puntos_importantes or []
                 }
             }), 200
         else:
@@ -539,6 +566,7 @@ def api_editar_ruta():
 
     except Exception as e:
         return jsonify({"success": False, "message": f"Error: {str(e)}"}), 500
+
 
 
 @app.route("/api/editar_conductor", methods=["PUT"])
@@ -587,10 +615,11 @@ def api_asignar_ruta():
     try:
         data = request.form
 
+        # 1️⃣ Datos obligatorios
         id_vehiculo = int(data.get("vehiculo"))
         destino_completo = data.get("destino")
         destino_coords = data.get("destino_coords")
-        fecha = date.today().isoformat()  # <-- Forzamos la fecha actual del sistema
+        fecha = date.today().isoformat()  # Usar fecha actual del servidor
 
         if not all([id_vehiculo, destino_completo, destino_coords]):
             return jsonify({"success": False, "message": "Faltan campos requeridos"}), 400
@@ -600,29 +629,65 @@ def api_asignar_ruta():
         except Exception:
             return jsonify({"success": False, "message": "Coordenadas de destino inválidas"}), 400
 
-        destino = destino_completo
+        # 2️⃣ Puntos de recojo (opcional)
+        puntos_importantes = None
+        puntos_json = data.get("puntos_importantes")
+        if puntos_json:
+            try:
+                import json
+                puntos_importantes = json.loads(puntos_json)
+            except Exception:
+                return jsonify({"success": False, "message": "Formato de puntos importantes inválido"}), 400
 
+        # 3️⃣ Guardar usando tu lógica
         success, msg, id_ruta = controlador_rutas.registrar_ruta_solo_con_vehiculo(
             id_vehiculo=id_vehiculo,
-            destino=destino,
+            destino=destino_completo,
             destino_lat=destino_lat,
             destino_lon=destino_lon,
-            fecha=fecha  # <-- Fecha actual
+            fecha=fecha,
+            puntos_importantes=puntos_importantes
         )
 
+        # ✅ Si se guardó, recupera los puntos reales para devolverlos
+        puntos_guardados = []
         if success:
-            vehiculo = controlador_rutas.obtener_vehiculo_por_id(id_vehiculo)
+            conexion = obtener_conexion()
+            try:
+                with conexion.cursor() as cursor:
+                    cursor.execute("""
+                        SELECT nombre, lat, lon, orden
+                        FROM puntos_importantes
+                        WHERE id_ruta = %s
+                        ORDER BY orden ASC;
+                    """, (id_ruta,))
+                    for row in cursor.fetchall():
+                        puntos_guardados.append({
+                            "nombre": row[0],
+                            "lat": row[1],
+                            "lon": row[2],
+                            "orden": row[3]
+                        })
+            finally:
+                conexion.close()
+
+        # 4️⃣ Vehículo para mostrar
+        vehiculo = controlador_rutas.obtener_vehiculo_por_id(id_vehiculo)
+
+        # 5️⃣ Respuesta final
+        if success:
             return jsonify({
                 "success": True,
                 "message": msg,
                 "ruta": {
                     "id": id_ruta,
-                    "destino": destino,
+                    "destino": destino_completo,
                     "fecha": fecha,
                     "lat": destino_lat,
                     "lon": destino_lon,
                     "vehiculo": f"{vehiculo['modelo']} - {vehiculo['placa']}" if vehiculo else "N/D",
-                    "vehiculo_id": id_vehiculo
+                    "vehiculo_id": id_vehiculo,
+                    "puntos_importantes": puntos_guardados  # 👉 Ahora SÍ se devuelven
                 }
             }), 200
         else:
@@ -630,6 +695,7 @@ def api_asignar_ruta():
 
     except Exception as e:
         return jsonify({"success": False, "message": str(e)}), 500
+
 
 @app.route("/api/vehiculos_disponibles")
 def vehiculos_disponibles():
@@ -740,30 +806,29 @@ def obtener_ruta_actual():
         conexion.close()
         
         
-# En tu backend Flask
-@app.route("/api/guardar_trazado_real", methods=["POST"])
+@app.route('/api/guardar_trazado_real', methods=['POST'])
 def guardar_trazado_real():
-    data = request.get_json()
-    id_ruta = data.get("id_ruta")
-    coordenadas = data.get("coordenadas", [])
+    data = request.json
+    id_ruta = data.get('id_ruta')
+    coordenadas = data.get('coordenadas', [])
 
     if not id_ruta or not coordenadas:
-        return jsonify({"success": False, "message": "Datos incompletos"}), 400
+        return jsonify({"success": False, "message": "Datos incompletos"})
 
     try:
         conexion = obtener_conexion()
         with conexion.cursor() as cursor:
             for punto in coordenadas:
                 cursor.execute("""
-                    INSERT INTO ruta_real_trazada (id_ruta, latitud, longitud, registrado_en)
-                    VALUES (%s, %s, %s, NOW())
-                """, (id_ruta, punto["lat"], punto["lng"]))
+                    INSERT INTO ruta_real_trazada (id_ruta, latitud, longitud)
+                    VALUES (%s, %s, %s)
+                """, (id_ruta, punto['lat'], punto['lng']))
         conexion.commit()
-        return jsonify({"success": True}), 200
+        return jsonify({"success": True})
     except Exception as e:
-        return jsonify({"success": False, "message": str(e)}), 500
-    finally:
-        conexion.close()
+        print("Error al guardar trazado:", e)
+        return jsonify({"success": False, "message": str(e)})
+
 
 
 @app.route("/api/estado_ruta_actual", methods=["GET"])
@@ -786,6 +851,29 @@ def estado_ruta_actual():
         return jsonify({"error": str(e)}), 500
     finally:
         conexion.close()
+    
+# api_ruta.py
+
+@app.route('/api/ubicaciones_ruta/<int:id_ruta>', methods=['GET'])
+def obtener_ruta_real(id_ruta):
+    try:
+        conexion = obtener_conexion()
+        with conexion.cursor() as cursor:
+            cursor.execute("""
+                SELECT latitud, longitud 
+                FROM ruta_real_trazada
+                WHERE id_ruta = %s
+                ORDER BY registrado_en ASC
+            """, (id_ruta,))
+            
+            puntos = [{"lat": row[0], "lng": row[1]} for row in cursor.fetchall()]
+        
+        return jsonify({"success": True, "puntos": puntos})
+    except Exception as e:
+        print("❌ Error al obtener trazado:", e)
+        return jsonify({"success": False, "message": str(e)})
+
+
 
 
 

@@ -137,13 +137,30 @@
                                 </div>
                                 <input type="hidden" id="ruta_id" name="ruta_id">
                                 <div class="mb-3">
-                                    <label for="destino_input">Destino</label>
+                                    <label for="destino_input" class="form-label">Destino</label>
                                     <input type="text" id="destino_input" name="destino" class="form-control"
                                         placeholder="Buscar dirección de destino" required>
                                     <input type="hidden" name="destino_coords" id="destino_coords">
-                                    <div id="mapa_destino" class="mt-2" style="height: 250px; border: 1px solid #ccc;">
+                                </div>
+
+                                <!-- PUNTOS DE RECOJO INTERMEDIOS -->
+                                <div class="mb-3">
+                                    <label class="form-label">Puntos de Recojo Intermedios</label>
+                                    <div id="contenedorPuntosRecojo"></div>
+                                    <button type="button" id="btnAgregarPuntoRecojo"
+                                        class="btn btn-outline-primary btn-sm mt-2">
+                                        ➕ Agregar Punto de Recojo
+                                    </button>
+                                    <div class="form-text">
+                                        Puedes agregar varios puntos intermedios, cada uno se mostrará en el mapa y
+                                        guardará dirección y coordenadas.
                                     </div>
                                 </div>
+
+                                <div id="mapa_destino" class="mt-2" style="height: 250px; border: 1px solid #ccc;">
+                                </div>
+
+
                                 <div class="alert alert-secondary text-center small">
                                     📡 <strong>Nota:</strong> El punto de <strong>origen</strong> será capturado
                                     automáticamente desde el GPS del vehículo.
@@ -159,7 +176,6 @@
                         <div class="col-lg-6 table-section">
                             <h5 class="mb-3">Rutas Programadas</h5>
 
-                            <!-- envoltorio responsivo -->
                             <div class="table-responsive">
                                 <table id="tablaRutas" class="table table-bordered table-hover tabla-rutas">
                                     <thead class="table-light">
@@ -173,7 +189,20 @@
                                     <tbody>
                                         {% for ruta in rutas_programadas %}
                                         <tr data-id="{{ ruta.id }}">
-                                            <td class="col-destino">{{ ruta.destino.split(',')[0] }}</td>
+                                            <td class="col-destino">
+                                                {{ ruta.destino.split(',')[0] }}
+                                                {% if ruta.puntos_importantes %}
+                                                <div class="border rounded p-2 mt-2 bg-info-subtle small">
+                                                    <strong>Puntos de Recojo:</strong>
+                                                    <ul class="mb-0 ps-3">
+                                                        {% for punto in ruta.puntos_importantes %}
+                                                        <li><strong>P{{ punto.orden }}</strong>: {{ punto.nombre }}</li>
+                                                        {% endfor %}
+                                                    </ul>
+                                                </div>
+                                                {% endif %}
+
+                                            </td>
                                             <td class="col-fecha">{{ ruta.fecha }}</td>
                                             <td class="col-vehiculo">{{ ruta.vehiculo }}</td>
                                             <td class="text-center">
@@ -198,6 +227,7 @@
                                 </table>
                             </div>
                         </div>
+
 
                     </div>
                 </div>
@@ -281,6 +311,8 @@
 
 <script>
     let mapaDestino, marcadorDestino, geocoder;
+    let puntosRecojo = [];  // GLOBAL
+    let modoAgregarPuntoRecojo = false; // bandera para no mezclar clics
 
     function initMap() {
         const chiclayo = { lat: -6.7714, lng: -79.8409 };
@@ -316,7 +348,13 @@
             inputCoords.value = `${location.lat()},${location.lng()}`;
         });
 
+        marcadorDestino.addListener("dragend", function () {
+            const pos = marcadorDestino.getPosition();
+            inputCoords.value = `${pos.lat()},${pos.lng()}`;
+        });
+
         mapaDestino.addListener("click", function (e) {
+            if (modoAgregarPuntoRecojo) return; // ignora si está en modo recojo
             marcadorDestino.setPosition(e.latLng);
             inputCoords.value = `${e.latLng.lat()},${e.latLng.lng()}`;
             reverseGeocode(e.latLng, inputDestino);
@@ -330,6 +368,90 @@
             }
         });
     }
+
+    // === Botón para agregar punto recojo ===
+
+    const contenedorPuntos = document.getElementById("contenedorPuntosRecojo");
+    const btnAgregarPunto = document.getElementById("btnAgregarPuntoRecojo");
+
+    btnAgregarPunto.addEventListener("click", function () {
+        const index = puntosRecojo.length;
+
+        // Crear contenedor del punto con botón ❌
+        const div = document.createElement("div");
+        div.classList.add("mb-2", "border", "rounded", "p-2", "position-relative");
+        div.innerHTML = `
+    <label class="form-label small">Punto ${index + 1}</label>
+    <button type="button" class="btn-close btnBorrarPunto position-absolute top-0 end-0" aria-label="Eliminar"></button>
+    <input type="text" class="form-control mb-1 punto-nombre" placeholder="Nombre del punto (opcional)">
+    <input type="hidden" class="punto-coords">
+    <div class="small text-muted">Haz clic en el mapa para ubicar este punto</div>
+  `;
+
+        contenedorPuntos.appendChild(div);
+
+        // Crear marcador azul
+        const marcadorPunto = new google.maps.Marker({
+            map: mapaDestino,
+            draggable: true,
+            label: `P${index + 1}`,
+            position: mapaDestino.getCenter(),
+            icon: {
+                path: google.maps.SymbolPath.CIRCLE,
+                scale: 6,
+                fillColor: "#007bff",
+                fillOpacity: 1,
+                strokeWeight: 2,
+                strokeColor: "#ffffff"
+            }
+        });
+
+        puntosRecojo.push({ marcador: marcadorPunto, div: div });
+
+        // Inicializa coords
+        const posInicial = marcadorPunto.getPosition();
+        div.querySelector(".punto-coords").value = `${posInicial.lat()},${posInicial.lng()}`;
+
+        // Modo agregar punto para evitar confusiones
+        modoAgregarPuntoRecojo = true;
+
+        const clickListener = mapaDestino.addListener("click", function (e) {
+            marcadorPunto.setPosition(e.latLng);
+            div.querySelector(".punto-coords").value = `${e.latLng.lat()},${e.latLng.lng()}`;
+
+            geocoder.geocode({ location: e.latLng }, function (results, status) {
+                if (status === "OK" && results[0]) {
+                    div.querySelector(".punto-nombre").value = results[0].formatted_address;
+                }
+            });
+
+            google.maps.event.removeListener(clickListener);
+            modoAgregarPuntoRecojo = false;
+        });
+
+        marcadorPunto.addListener("dragend", function () {
+            const pos = marcadorPunto.getPosition();
+            div.querySelector(".punto-coords").value = `${pos.lat()},${pos.lng()}`;
+
+            geocoder.geocode({ location: pos }, function (results, status) {
+                if (status === "OK" && results[0]) {
+                    div.querySelector(".punto-nombre").value = results[0].formatted_address;
+                }
+            });
+        });
+
+        // ✅ Botón ❌ para borrar este punto y su marcador
+        div.querySelector(".btnBorrarPunto").addEventListener("click", function () {
+            marcadorPunto.setMap(null); // Elimina marcador
+            contenedorPuntos.removeChild(div); // Quita HTML
+            puntosRecojo = puntosRecojo.filter(p => p.div !== div); // Actualiza lista
+        });
+    });
+
+
+
+
+
 </script>
 
 
@@ -492,98 +614,173 @@
         asignarEventosEliminar();
         actualizarOpcionesConductorVisual();
 
-
         formRuta.addEventListener("submit", async function (e) {
             e.preventDefault();
 
+            // ========================
+            // 1️⃣ Datos generales
+            // ========================
             const rutaId = document.getElementById("ruta_id").value.trim();
             const formData = new FormData(this);
+
+            // ========================
+            // 2️⃣ Puntos de recojo dinámicos
+            // ========================
+            const puntosRecojo = [];
+            document.querySelectorAll("#contenedorPuntosRecojo > div").forEach((div, index) => {
+                const nombre = div.querySelector(".punto-nombre").value || "";
+                const coords = div.querySelector(".punto-coords").value;
+
+                if (coords) {
+                    const [lat, lon] = coords.split(",").map(Number);
+                    puntosRecojo.push({
+                        nombre: nombre,
+                        descripcion: "",  // Opcional: puedes extender esto a un textarea si quieres.
+                        lat: lat,
+                        lon: lon,
+                        orden: index + 1
+                    });
+                }
+            });
+
+            if (puntosRecojo.length > 0) {
+                formData.append("puntos_importantes", JSON.stringify(puntosRecojo));
+            }
+
+            // ========================
+            // 3️⃣ Configurar método y URL
+            // ========================
             const url = rutaId ? "/api/editar_ruta" : "/api/asignar_ruta";
-            const method = rutaId ? "PUT" : "POST";
+            const method = "POST";  // ⚡ Siempre POST para compatibilidad con FormData.
 
             try {
+                // ========================
+                // 4️⃣ Ejecutar petición
+                // ========================
                 const response = await fetch(url, { method, body: formData });
                 const result = await response.json();
 
                 if (result.success) {
-                    alertify.success("✅ " + result.message);
+                    alertify.success(`✅ ${result.message}`);
                     const r = result.ruta;
 
-                    // 🔄 Actualizar estado de vehículos
+                    // ========================
+                    // 5️⃣ Actualizar estados de vehículo
+                    // ========================
                     if (rutaId) {
                         const idVehiculoAnterior = botonEdicionActiva?.dataset.vehiculo;
                         if (idVehiculoAnterior && idVehiculoAnterior !== r.vehiculo_id) {
-                            actualizarEstadoVehiculo(idVehiculoAnterior, false); // desocupa anterior
+                            actualizarEstadoVehiculo(idVehiculoAnterior, false);
                         }
                     }
-                    actualizarEstadoVehiculo(r.vehiculo_id, true); // ocupa nuevo
+                    actualizarEstadoVehiculo(r.vehiculo_id, true);
 
+                    // ========================
+                    // 6️⃣ Generar HTML de puntos de recojo
+                    // ========================
+                    let puntosHtml = "";
+                    if (r.puntos_importantes && r.puntos_importantes.length > 0) {
+                        puntosHtml = `
+          <div class="border rounded p-2 mt-2 bg-info-subtle small">
+            <strong>Puntos de Recojo:</strong>
+            <ul class="mb-0 ps-3">
+        `;
+                        r.puntos_importantes.forEach(p => {
+                            puntosHtml += `<li><strong>P${p.orden}</strong>: ${p.nombre || "Sin nombre"}</li>`;
+                        });
+                        puntosHtml += `</ul></div>`;
+                    }
+
+                    // ========================
+                    // 7️⃣ Crear o reemplazar fila de tabla
+                    // ========================
                     const nuevaFila = `
-                        <tr data-id="${r.id}">
-                            <td class="col-destino">${r.destino.split(',')[0]}</td>
-                            <td class="col-fecha">${r.fecha}</td>
-                            <td class="col-vehiculo">${r.vehiculo}</td>
-                            <td class="text-center">
-                                <div class="d-flex justify-content-center gap-2">
-                                    <button class="btn btn-success btn-sm btnEditarRuta"
-                                        data-id="${r.id}"
-                                        data-conductor=""
-                                        data-vehiculo="${r.vehiculo_id}"
-                                        data-destino="${r.destino}"
-                                        data-lat="${r.lat}"
-                                        data-lon="${r.lon}"
-                                        data-fecha="${r.fecha}">
-                                        <i class="fas fa-pen"></i>
-                                    </button>
-                                    <button class="btn btn-danger btn-sm btnEliminarRuta"
-                                        data-id="${r.id}">
-                                        <i class="fas fa-trash-alt"></i>
-                                    </button>
-                                </div>
-                            </td>
-                        </tr>
-                    `;
+        <tr data-id="${r.id}">
+          <td class="col-destino">
+            ${r.destino.split(',')[0]}
+            ${puntosHtml}
+          </td>
+          <td class="col-fecha">${r.fecha}</td>
+          <td class="col-vehiculo">${r.vehiculo}</td>
+          <td class="text-center">
+            <div class="d-flex justify-content-center gap-2">
+              <button class="btn btn-success btn-sm btnEditarRuta"
+                data-id="${r.id}"
+                data-conductor=""
+                data-vehiculo="${r.vehiculo_id}"
+                data-destino="${r.destino}"
+                data-lat="${r.lat}"
+                data-lon="${r.lon}"
+                data-fecha="${r.fecha}">
+                <i class="fas fa-pen"></i>
+              </button>
+              <button class="btn btn-danger btn-sm btnEliminarRuta"
+                data-id="${r.id}">
+                <i class="fas fa-trash-alt"></i>
+              </button>
+            </div>
+          </td>
+        </tr>
+      `;
 
                     const tbody = document.querySelector("#tablaRutas tbody");
-                    const fila = tbody.querySelector(`tr[data-id="${r.id}"]`);
+                    const filaExistente = tbody.querySelector(`tr[data-id="${r.id}"]`);
                     const nuevaFilaElemento = crearElementoDesdeHTML(nuevaFila);
-                    if (fila) {
-                        fila.replaceWith(nuevaFilaElemento);
+
+                    if (filaExistente) {
+                        filaExistente.replaceWith(nuevaFilaElemento);
                     } else {
                         tbody.insertAdjacentElement("afterbegin", nuevaFilaElemento);
                     }
 
+                    // ========================
+                    // 8️⃣ Actualizar combo de rutas sin conductor
+                    // ========================
                     const comboRutasSinConductor = document.getElementById("ruta_sin_conductor");
                     let opcionExistente = comboRutasSinConductor.querySelector(`option[value="${r.id}"]`);
                     const nuevoTexto = `${r.destino.split(',')[0]} - ${r.fecha}`;
 
                     if (opcionExistente) {
-                        // 🔄 Actualiza texto si ya existe
                         opcionExistente.textContent = nuevoTexto;
                     } else {
-                        // ➕ Agrega nueva opción si no existe
                         const nuevaOpcion = document.createElement("option");
                         nuevaOpcion.value = r.id;
                         nuevaOpcion.textContent = nuevoTexto;
                         comboRutasSinConductor.appendChild(nuevaOpcion);
                     }
 
-
+                    // ========================
+                    // 9️⃣ Reasignar eventos y limpiar formulario
+                    // ========================
                     asignarEventosEditar();
-                    cancelarEdicion();
                     asignarEventosEliminar();
                     actualizarOpcionesConductorVisual();
 
+                    formRuta.reset();
+                    document.getElementById("ruta_id").value = "";
+                    document.getElementById("destino_coords").value = "";
+                    fechaInput.value = getFechaLimaHoy();
+                    document.getElementById("textoBtnRuta").textContent = "Guardar Ruta";
 
+                    puntosRecojo.forEach(p => {
+                        if (p.marcador) p.marcador.setMap(null);
+                    });
+                    puntosRecojo.length = 0;
+                    contenedorPuntos.innerHTML = "";
 
                 } else {
-                    alertify.error("❌ " + result.message);
+                    alertify.error(`❌ ${result.message}`);
                 }
+
             } catch (err) {
                 console.error(err);
                 alertify.error("❌ Error de conexión al servidor.");
             }
         });
+
+
+
+
 
         formAsignar.addEventListener("submit", async function (e) {
             e.preventDefault();

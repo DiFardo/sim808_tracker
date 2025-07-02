@@ -129,7 +129,10 @@
                 data-origen-lon="{{ ruta.origen_lon if ruta.origen_lon else '' }}"
                 data-destino-lat="{{ ruta.destino_lat if ruta.destino_lat else '' }}"
                 data-destino-lon="{{ ruta.destino_lon if ruta.destino_lon else '' }}"
-                data-conductor-id="{{ ruta.id_persona if ruta.id_persona else '' }}">
+                data-conductor-id="{{ ruta.id_persona if ruta.id_persona else '' }}" {% if ruta.puntos_importantes %}
+                data-puntos-recojo='{{ ruta.puntos_importantes | tojson | safe }}' {% else %} data-puntos-recojo='[]' {%
+                endif %}>
+
 
                 {% set estado = ruta.estado_envio %}
                 {% set asignado = ruta.id_persona is not none %}
@@ -170,8 +173,20 @@
                 </div>
 
                 <div class="time">
-                  ⏱️ <strong>Duración:</strong> {{ ruta.duracion if ruta.duracion else "No disponible" }}
+                  📍 <strong>Destino:</strong> {{ ruta.destino.split(',')[0] }}
                 </div>
+
+                {% if ruta.puntos_importantes %}
+                <div class="mt-2 border rounded p-2 bg-info-subtle small">
+                  <strong>Puntos de Recojo:</strong>
+                  <ul class="mb-0 ps-3">
+                    {% for p in ruta.puntos_importantes %}
+                    <li>– {{ p.nombre or "Sin nombre" }}</li>
+                    {% endfor %}
+                  </ul>
+                </div>
+                {% endif %}
+
                 <div class="estado-gps text-muted small mt-1"></div>
               </div>
               {% endfor %}
@@ -373,11 +388,17 @@
     }
   }
 
-  function trazarRuta(origen, destino) {
+  function trazarRuta(origen, destino, puntosRecojo = []) {
     directionsRenderer.set('directions', null);
     if (marcadorOrigen) marcadorOrigen.setMap(null);
     if (marcadorDestino) marcadorDestino.setMap(null);
     if (rutaPolyline) rutaPolyline.setMap(null);
+
+    // 🔵 Limpiar marcadores de puntos de recojo previos si existen
+    if (window.marcadoresRecojo) {
+      window.marcadoresRecojo.forEach(m => m.setMap(null));
+    }
+    window.marcadoresRecojo = [];
 
     const request = {
       origin: origen,
@@ -417,20 +438,43 @@
           map: map,
           icon: {
             url: "data:image/svg+xml;charset=UTF-8," + encodeURIComponent(`
-              <svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 384 512\" width=\"40\" height=\"40\">
-                <path fill=\"#FF3B3B\" stroke=\"#1A1A4A\" stroke-width=\"15\" d=\"M192 0C86 0 0 86 0 192c0 87.7 104.7 209.7 
-                160 272.7 7.7 8.9 21.3 8.9 29 0C279.3 401.7 384 279.7 384 192 384 86 298 0 192 0zm0 272c-44.2 
-                0-80-35.8-80-80s35.8-80 80-80 80 35.8 80 80-35.8 80-80 80z\"/>
-              </svg>
-            `),
+            <svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 384 512\" width=\"40\" height=\"40\">
+              <path fill=\"#FF3B3B\" stroke=\"#1A1A4A\" stroke-width=\"15\" d=\"M192 0C86 0 0 86 0 192c0 87.7 104.7 209.7 
+              160 272.7 7.7 8.9 21.3 8.9 29 0C279.3 401.7 384 279.7 384 192 384 86 298 0 192 0zm0 272c-44.2 
+              0-80-35.8-80-80s35.8-80 80-80 80 35.8 80 80-35.8 80-80 80z\"/>
+            </svg>
+          `),
             scaledSize: new google.maps.Size(40, 40),
             anchor: new google.maps.Point(20, 40)
           },
           title: "Destino"
         });
+
+        // ✅ Agregar marcadores para puntos de recojo
+        if (Array.isArray(puntosRecojo) && puntosRecojo.length > 0) {
+          puntosRecojo.forEach((p, index) => {
+            const marcador = new google.maps.Marker({
+              position: { lat: parseFloat(p.lat), lng: parseFloat(p.lon) },
+              map: map,
+              label: `P${index + 1}`,
+              icon: {
+                path: google.maps.SymbolPath.CIRCLE,
+                scale: 6,
+                fillColor: "#007bff",
+                fillOpacity: 1,
+                strokeWeight: 2,
+                strokeColor: "#ffffff"
+              },
+              title: p.nombre || `Punto ${index + 1}`
+            });
+            window.marcadoresRecojo.push(marcador);
+          });
+        }
+
       }
     });
   }
+
 
   function actualizarSeguimiento(posicion) {
     actualizarDistanciaRestante(posicion);
@@ -461,38 +505,38 @@
   let ultimaLatLon = null;
   let puntoOrigenInicial = null;
 
-  function iniciarMonitoreoTiempoReal(idRuta) {
-    // 🧹 Limpiar datos anteriores
-    localStorage.removeItem("coords_recorridas");
-    localStorage.removeItem("ultima_posicion");
-    rutaAlternativaCoords = [];
-    puntoOrigenInicial = null;
+  // function iniciarMonitoreoTiempoReal(idRuta) {
+  //   // 🧹 Limpiar datos anteriores
+  //   localStorage.removeItem("coords_recorridas");
+  //   localStorage.removeItem("ultima_posicion");
+  //   rutaAlternativaCoords = [];
+  //   puntoOrigenInicial = null;
 
-    if (intervaloSeguimiento) clearInterval(intervaloSeguimiento);
+  //   if (intervaloSeguimiento) clearInterval(intervaloSeguimiento);
 
-    intervaloSeguimiento = setInterval(() => {
-      fetch(`/api/ultima_ubicacion?id_ruta=${idRuta}`)
-        .then(res => res.json())
-        .then(data => {
-          console.log("📡 Datos de ubicación recibidos:", data);
-          if (data.success && data.lat && data.lon) {
-            const nuevaLat = parseFloat(data.lat);
-            const nuevaLon = parseFloat(data.lon);
+  //   intervaloSeguimiento = setInterval(() => {
+  //     fetch(`/api/ultima_ubicacion?id_ruta=${idRuta}`)
+  //       .then(res => res.json())
+  //       .then(data => {
+  //         console.log("📡 Datos de ubicación recibidos:", data);
+  //         if (data.success && data.lat && data.lon) {
+  //           const nuevaLat = parseFloat(data.lat);
+  //           const nuevaLon = parseFloat(data.lon);
 
-            if (nuevaLat !== ultimaLat || nuevaLon !== ultimaLon) {
-              ultimaLat = nuevaLat;
-              ultimaLon = nuevaLon;
+  //           if (nuevaLat !== ultimaLat || nuevaLon !== ultimaLon) {
+  //             ultimaLat = nuevaLat;
+  //             ultimaLon = nuevaLon;
 
-              const nuevaPos = { lat: nuevaLat, lng: nuevaLon };
-              procesarUbicacionConSnapInterpolado(nuevaPos);
-            }
-          }
-        })
-        .catch(error => {
-          console.error("❌ Error al obtener ubicación del vehículo:", error);
-        });
-    }, 2000);
-  }
+  //             const nuevaPos = { lat: nuevaLat, lng: nuevaLon };
+  //             procesarUbicacionConSnapInterpolado(nuevaPos);
+  //           }
+  //         }
+  //       })
+  //       .catch(error => {
+  //         console.error("❌ Error al obtener ubicación del vehículo:", error);
+  //       });
+  //   }, 2000);
+  // }
 
 
   let bufferPuntosCrudos = [];
@@ -694,7 +738,11 @@
             };
 
             map.setCenter(origen);
-            trazarRuta(origen, destino);
+            const puntosRecojo = JSON.parse(box.dataset.puntosRecojo || "[]");
+
+            map.setCenter(origen);
+
+            trazarRuta(origen, destino, puntosRecojo);
             iniciarMonitoreoTiempoReal(idRuta);
             actualizarContenidoTarjetas();
 
@@ -789,6 +837,7 @@
       const rutaId = box.dataset.rutaId;
       const btnIniciar = box.querySelector('.btn-iniciar-ruta');
 
+      // Botón para iniciar ruta (solo para Conductores)
       if (btnIniciar) {
         const conductorId = box.dataset.conductorId;
 
@@ -803,7 +852,6 @@
 
           btnIniciar.addEventListener('click', function (e) {
             e.stopPropagation();
-            rutaEnInicio = true;
 
             btnIniciar.disabled = true;
             btnIniciar.innerHTML = `<i class='fas fa-spinner fa-spin'></i> Enviando...`;
@@ -836,12 +884,14 @@
           });
         }
       }
+
+      // Click en la tarjeta .fleet-box
       box.addEventListener('click', function () {
         const yaSeleccionada = box.classList.contains('active');
         const rutaSeleccionadaActual = localStorage.getItem("ruta_activa");
 
         if (yaSeleccionada) {
-          // 🔹 Deselecciona ruta activa
+          // Deseleccionar ruta activa
           box.classList.remove('active', 'bg-info-subtle');
           localStorage.removeItem("ruta_activa");
 
@@ -853,14 +903,21 @@
           if (marcadorMovil) marcadorMovil.setVisible(false);
           if (circuloMovil) circuloMovil.setVisible(false);
 
-          // 🧹 Limpieza al deseleccionar
+          // 🧹 LIMPIA círculos de puntos de recojo también
+          if (puntosRecojoMarkers && puntosRecojoMarkers.length > 0) {
+            puntosRecojoMarkers.forEach(m => m.setMap(null));
+          }
+
           localStorage.removeItem("coords_recorridas");
           localStorage.removeItem("ultima_posicion");
           rutaAlternativaCoords = [];
           puntoOrigenInicial = null;
 
+          clearInterval(intervaloSeguimiento);
+          clearInterval(intervaloSincronizacion);
+
         } else {
-          // 🔹 Si es diferente a la anterior, limpiar rastro de la anterior
+          // Limpiar si selecciono otra ruta
           if (rutaSeleccionadaActual && rutaSeleccionadaActual !== rutaId) {
             localStorage.removeItem("coords_recorridas");
             localStorage.removeItem("ultima_posicion");
@@ -872,42 +929,46 @@
           box.classList.add('active', 'bg-info-subtle');
           marcarTarjetaActiva(rutaId);
 
-          const conductorId = box.dataset.conductorId;
           const origenLat = parseFloat(box.dataset.origenLat);
           const origenLon = parseFloat(box.dataset.origenLon);
 
-          // ✅ Validación: sin conductor
-          if (!conductorId || conductorId === "null" || conductorId === "") {
-            alertify.error("🚫 No hay conductor asignado");
-            return;
-          }
-
-          // ✅ Validación: sin coordenadas de origen
           if (!origenLat || !origenLon) {
             alertify.warning("📡 Ruta no iniciada o sin coordenadas de origen");
-            esperarYActualizarRuta(rutaId, box, null);
             return;
           }
 
-          // ✅ Todo correcto, trazamos
           const origen = { lat: origenLat, lng: origenLon };
           const destino = {
             lat: parseFloat(box.dataset.destinoLat),
             lng: parseFloat(box.dataset.destinoLon)
           };
 
-          alertify.success("✅ Mostrando ruta asignada");
+          // ✅ Leer puntos de recojo desde dataset
+          let puntosRecojo = [];
+          try {
+            puntosRecojo = JSON.parse(box.dataset.puntosRecojo || "[]");
+          } catch (e) {
+            console.warn("⚠️ Puntos de recojo mal formateados:", e);
+          }
 
           map.setCenter(origen);
-          trazarRuta(origen, destino);
-          iniciarMonitoreoTiempoReal(rutaId);
+          trazarRuta(origen, destino, puntosRecojo); // <-- Ahora envía los puntos intermedios
 
-          // 🔁 VOLVER A MOSTRAR RUTA REAL SI EXISTE EN LOCALSTORAGE
+          // 🔑 Siempre sincroniza la ruta real (línea roja + punto)
+          sincronizarRutaReal(rutaId);
+          console.log("🔴 Sincronización de ruta real activa");
+
+          // Si es Conductor, también inicia GPS real
+          if (rolUsuario === "Conductor") {
+            iniciarMonitoreoTiempoReal(rutaId);
+            console.log("🚗 Conductor: monitoreo en vivo");
+          }
+
+          // Restaurar polilínea roja si existe localStorage
           const coordsGuardadas = localStorage.getItem("coords_recorridas");
           if (coordsGuardadas) {
             rutaAlternativaCoords = JSON.parse(coordsGuardadas);
             puntoOrigenInicial = rutaAlternativaCoords[0];
-
             if (!rutaSecundariaPolyline) {
               rutaSecundariaPolyline = new google.maps.Polyline({
                 path: rutaAlternativaCoords,
@@ -922,88 +983,152 @@
             }
           }
 
-          if (marcadorMovil) marcadorMovil.setVisible(true);
-          if (circuloMovil) circuloMovil.setVisible(true);
+          // Restaurar marcador móvil
+          const ultimaPos = localStorage.getItem("ultima_posicion");
+          if (ultimaPos) {
+            const punto = JSON.parse(ultimaPos);
+            if (!marcadorMovil) {
+              marcadorMovil = new google.maps.Marker({
+                position: punto,
+                map: map,
+                icon: {
+                  path: google.maps.SymbolPath.CIRCLE,
+                  scale: 6,
+                  fillColor: "#ff0000",
+                  fillOpacity: 1,
+                  strokeWeight: 2,
+                  strokeColor: "#ffffff"
+                },
+                title: "Ubicación del vehículo"
+              });
+            } else {
+              marcadorMovil.setPosition(punto);
+              marcadorMovil.setMap(map);
+            }
+
+            if (!circuloMovil) {
+              circuloMovil = new google.maps.Circle({
+                strokeColor: "#4285F4",
+                strokeOpacity: 0.5,
+                strokeWeight: 1,
+                fillColor: "#4285F4",
+                fillOpacity: 0.2,
+                map: map,
+                center: punto,
+                radius: 10
+              });
+            } else {
+              circuloMovil.setCenter(punto);
+              circuloMovil.setMap(map);
+            }
+          }
+
           if (rutaSecundariaPolyline) rutaSecundariaPolyline.setVisible(true);
         }
       });
+
     });
 
     setInterval(actualizarContenidoTarjetas, 15000);
   });
 
+  // ✅ También `window.load` para restaurar todo al recargar
   window.addEventListener('load', function () {
     const rutaIdGuardada = localStorage.getItem("ruta_activa");
+    if (!rutaIdGuardada) return;
 
-    if (rutaIdGuardada) {
-      const box = document.querySelector(`.fleet-box[data-ruta-id="${rutaIdGuardada}"]`);
-      if (box) {
-        const origenLat = parseFloat(box.dataset.origenLat);
-        const origenLon = parseFloat(box.dataset.origenLon);
+    const box = document.querySelector(`.fleet-box[data-ruta-id="${rutaIdGuardada}"]`);
+    if (!box) return;
 
-        if (origenLat && origenLon) {
-          const origen = { lat: origenLat, lng: origenLon };
-          const destino = {
-            lat: parseFloat(box.dataset.destinoLat),
-            lng: parseFloat(box.dataset.destinoLon)
-          };
-          map.setCenter(origen);
-          trazarRuta(origen, destino);
-          iniciarMonitoreoTiempoReal(rutaIdGuardada);
-          marcarTarjetaActiva(rutaIdGuardada);
-          alertify.success("✅ Origen registrado correctamente.");
+    const origenLat = parseFloat(box.dataset.origenLat);
+    const origenLon = parseFloat(box.dataset.origenLon);
 
-          const coordsGuardadas = localStorage.getItem("coords_recorridas");
-          const ultimaPos = localStorage.getItem("ultima_posicion");
+    if (origenLat && origenLon) {
+      const origen = { lat: origenLat, lng: origenLon };
+      const destino = {
+        lat: parseFloat(box.dataset.destinoLat),
+        lng: parseFloat(box.dataset.destinoLon)
+      };
 
-          if (coordsGuardadas && !puntoOrigenInicial) {
-            rutaAlternativaCoords = JSON.parse(coordsGuardadas);
-            puntoOrigenInicial = rutaAlternativaCoords[0];  // establecer solo si no había
-            rutaSecundariaPolyline = new google.maps.Polyline({
-              path: rutaAlternativaCoords,
-              strokeColor: '#FF0000',
-              strokeOpacity: 0.9,
-              strokeWeight: 4,
-              map: map
-            });
-          }
+      // ✅ Recupera los puntos de recojo desde dataset
+      let puntosRecojo = [];
+      try {
+        puntosRecojo = JSON.parse(box.dataset.puntosRecojo || "[]");
+      } catch (e) {
+        console.warn("⚠️ Puntos de recojo mal formateados:", e);
+      }
 
+      map.setCenter(origen);
+      trazarRuta(origen, destino, puntosRecojo);  // <-- Ahora los pasas aquí también
+      marcarTarjetaActiva(rutaIdGuardada);
 
-          if (ultimaPos && !marcadorMovil && !circuloMovil) {
-            const punto = JSON.parse(ultimaPos);
-            marcadorMovil = new google.maps.Marker({
-              position: punto,
-              map: map,
-              icon: {
-                path: google.maps.SymbolPath.CIRCLE,
-                scale: 6,
-                fillColor: "#ff0000",
-                fillOpacity: 1,
-                strokeWeight: 2,
-                strokeColor: "#ffffff"
-              },
-              title: "Ubicación del vehículo"
-            });
+      alertify.success("✅ Origen restaurado correctamente.");
 
-            circuloMovil = new google.maps.Circle({
-              strokeColor: "#4285F4",
-              strokeOpacity: 0.5,
-              strokeWeight: 1,
-              fillColor: "#4285F4",
-              fillOpacity: 0.2,
-              map: map,
-              center: punto,
-              radius: 10
-            });
+      sincronizarRutaReal(rutaIdGuardada);
+      console.log("🔴 Sincronización ruta real");
 
-            map.setCenter(punto);
-          }
+      if (rolUsuario === "Conductor") {
+        iniciarMonitoreoTiempoReal(rutaIdGuardada);
+        console.log("🚗 Conductor: Monitoreo en vivo");
+      }
+
+      const coordsGuardadas = localStorage.getItem("coords_recorridas");
+      if (coordsGuardadas) {
+        rutaAlternativaCoords = JSON.parse(coordsGuardadas);
+        puntoOrigenInicial = rutaAlternativaCoords[0];
+        if (!rutaSecundariaPolyline) {
+          rutaSecundariaPolyline = new google.maps.Polyline({
+            path: rutaAlternativaCoords,
+            strokeColor: '#FF0000',
+            strokeOpacity: 0.9,
+            strokeWeight: 4,
+            map: map
+          });
         } else {
-          alertify.message("⏳ La ruta está esperando coordenadas de origen...");
+          rutaSecundariaPolyline.setMap(map);
+          rutaSecundariaPolyline.setPath(rutaAlternativaCoords);
         }
       }
+
+      const ultimaPos = localStorage.getItem("ultima_posicion");
+      if (ultimaPos) {
+        const punto = JSON.parse(ultimaPos);
+        marcadorMovil = new google.maps.Marker({
+          position: punto,
+          map: map,
+          icon: {
+            path: google.maps.SymbolPath.CIRCLE,
+            scale: 6,
+            fillColor: "#ff0000",
+            fillOpacity: 1,
+            strokeWeight: 2,
+            strokeColor: "#ffffff"
+          },
+          title: "Ubicación del vehículo"
+        });
+
+        circuloMovil = new google.maps.Circle({
+          strokeColor: "#4285F4",
+          strokeOpacity: 0.5,
+          strokeWeight: 1,
+          fillColor: "#4285F4",
+          fillOpacity: 0.2,
+          map: map,
+          center: punto,
+          radius: 10
+        });
+
+        map.setCenter(punto);
+      }
     } else {
-      // 🧹 Si no hay ruta activa, limpiar cualquier marcador o línea existente
+      alertify.message("⏳ La ruta espera coordenadas de origen...");
+    }
+  });
+
+
+  // 🧹 Limpieza global si no hay ruta activa
+  window.addEventListener('load', function () {
+    if (!localStorage.getItem("ruta_activa")) {
       if (rutaSecundariaPolyline) rutaSecundariaPolyline.setMap(null);
       if (marcadorMovil) marcadorMovil.setMap(null);
       if (circuloMovil) circuloMovil.setMap(null);
@@ -1013,13 +1138,14 @@
   });
 
 
-</script>
-
-
 
 </script>
+
+
 
 <script>
+
+
   document.querySelectorAll(".btn-iniciar-gps").forEach(btn => {
     btn.addEventListener("click", function () {
       const idRuta = this.dataset.idRuta;
@@ -1059,16 +1185,16 @@
                 estadoDiv.innerHTML = `<div class="text-muted">🚀 Ruta activada. Esperando señal GPS...</div>`;
               } else if (paso === 2) {
                 estadoDiv.innerHTML = `
-                  <div class="d-flex align-items-center gap-2">
-                    <div class="spinner-border spinner-border-sm text-primary" role="status"></div>
-                    <span>📡 Buscando señal GPS del vehículo...</span>
-                  </div>`;
+                <div class="d-flex align-items-center gap-2">
+                  <div class="spinner-border spinner-border-sm text-primary" role="status"></div>
+                  <span>📡 Buscando señal GPS del vehículo...</span>
+                </div>`;
               } else if (paso === 3) {
                 estadoDiv.innerHTML = `
-                  <div class="d-flex align-items-center gap-2">
-                    <div class="spinner-border spinner-border-sm text-primary" role="status"></div>
-                    <span>📍 Registrando coordenadas de origen...</span>
-                  </div>`;
+                <div class="d-flex align-items-center gap-2">
+                  <div class="spinner-border spinner-border-sm text-primary" role="status"></div>
+                  <span>📍 Registrando coordenadas de origen...</span>
+                </div>`;
               }
             }
 
@@ -1108,18 +1234,26 @@
                       return;
                     }
 
-                    // Mostrar origen, destino y trazar ruta azul
+                    // Mostrar origen, destino y trazar ruta azul + puntos recojo
                     const origen = { lat, lng: lon };
                     const destino = {
                       lat: parseFloat(box.dataset.destinoLat),
                       lng: parseFloat(box.dataset.destinoLon)
                     };
 
+                    // ✅ RECUPERA PUNTOS RECOJO DEL dataset
+                    let puntosRecojo = [];
+                    try {
+                      puntosRecojo = JSON.parse(box.dataset.puntosRecojo || "[]");
+                    } catch (e) {
+                      console.warn("⚠️ Puntos de recojo mal formateados:", e);
+                    }
+
                     box.dataset.origenLat = lat;
                     box.dataset.origenLon = lon;
                     box.dataset.origenRegistrado = "true";
 
-                    trazarRuta(origen, destino);
+                    trazarRuta(origen, destino, puntosRecojo);
                     map.setCenter(origen);
 
                     if (estadoDiv) {
@@ -1146,6 +1280,7 @@
         });
     });
   });
+
   function iniciarMonitoreoTiempoReal(idRuta) {
     localStorage.setItem("ruta_activa", idRuta);
     localStorage.removeItem("coords_recorridas");
@@ -1192,6 +1327,63 @@
         console.error("❌ Error al capturar GPS:", err);
       });
     }, 2000); // simula el intervalo del SIM808
+  }
+
+  function sincronizarRutaReal(idRuta) {
+    if (!idRuta) return;
+
+    if (intervaloSincronizacion) clearInterval(intervaloSincronizacion);
+
+    intervaloSincronizacion = setInterval(() => {
+      fetch(`/api/ubicaciones_ruta/${idRuta}`)
+        .then(res => res.json())
+        .then(data => {
+          if (data.success && Array.isArray(data.puntos)) {
+            if (data.puntos.length === 0) {
+              console.warn("⚠️ No hay puntos guardados aún");
+              return;
+            }
+
+            rutaAlternativaCoords = data.puntos;
+
+            if (!rutaSecundariaPolyline) {
+              rutaSecundariaPolyline = new google.maps.Polyline({
+                path: rutaAlternativaCoords,
+                strokeColor: '#FF0000',
+                strokeOpacity: 0.9,
+                strokeWeight: 4,
+                map: map
+              });
+            } else {
+              rutaSecundariaPolyline.setMap(map); // ¡No olvides esto!
+              rutaSecundariaPolyline.setPath(rutaAlternativaCoords);
+            }
+
+            const ultimoPunto = data.puntos[data.puntos.length - 1];
+            if (ultimoPunto) {
+              if (marcadorMovil) marcadorMovil.setMap(null);
+              marcadorMovil = new google.maps.Marker({
+                position: ultimoPunto,
+                map: map,
+                icon: {
+                  path: google.maps.SymbolPath.CIRCLE,
+                  scale: 6,
+                  fillColor: "#ff0000",
+                  fillOpacity: 1,
+                  strokeWeight: 2,
+                  strokeColor: "#ffffff"
+                },
+                title: "Ubicación del vehículo"
+              });
+            }
+          } else {
+            console.warn("⚠️ No se recibieron puntos válidos");
+          }
+        })
+        .catch(err => {
+          console.error("❌ Error al sincronizar ruta real:", err);
+        });
+    }, 2000);
   }
 
 
