@@ -690,10 +690,6 @@
                         });
                         puntosHtml += `</ul></div>`;
                     }
-
-                    // ========================
-                    // 7️⃣ Crear o reemplazar fila de tabla
-                    // ========================
                     const nuevaFila = `
         <tr data-id="${r.id}">
           <td class="col-destino">
@@ -733,9 +729,6 @@
                         tbody.insertAdjacentElement("afterbegin", nuevaFilaElemento);
                     }
 
-                    // ========================
-                    // 8️⃣ Actualizar combo de rutas sin conductor
-                    // ========================
                     const comboRutasSinConductor = document.getElementById("ruta_sin_conductor");
                     let opcionExistente = comboRutasSinConductor.querySelector(`option[value="${r.id}"]`);
                     const nuevoTexto = `${r.destino.split(',')[0]} - ${r.fecha}`;
@@ -856,42 +849,58 @@
 </script>
 
 <script>
-    function asignarEventosEliminar() {
-        document.querySelectorAll(".btnEliminarRuta").forEach(btn => {
-            btn.addEventListener("click", function () {
-                const idRuta = this.dataset.id;
+  function asignarEventosEliminar() {
+    document.querySelectorAll(".btnEliminarRuta").forEach(btn => {
+      btn.addEventListener("click", function () {
+        const idRuta = this.dataset.id;
+        const btnEliminar = this; // referencia al botón clickeado
 
-                alertify.confirm(
-                    "Confirmar eliminación",
-                    "¿Estás seguro de que deseas eliminar esta ruta?",
-                    function () {
-                        fetch(`/api/ruta/${idRuta}`, {
-                            method: "DELETE",
-                            headers: {
-                                "Authorization": `Bearer ${localStorage.getItem("access_token")}`
-                            }
-                        })
-                            .then(res => res.json())
-                            .then(data => {
-                                if (data.success) {
-                                    alertify.success("🗑️ " + data.message);
-                                    setTimeout(() => location.reload(), 1000);
-                                } else {
-                                    alertify.error("❌ " + data.message);
-                                }
-                            })
-                            .catch(err => {
-                                console.error(err);
-                                alertify.error("❌ Error de conexión al eliminar.");
-                            });
-                    },
-                    function () {
-                        alertify.message("🚫 Eliminación cancelada");
-                    }
-                );
+        alertify.confirm(
+          "Confirmar eliminación",
+          "¿Estás seguro de que deseas eliminar esta ruta?",
+          function () {
+            fetch(`/api/ruta/${idRuta}`, {
+              method: "DELETE",
+              headers: {
+                "Authorization": `Bearer ${localStorage.getItem("access_token")}`
+              }
+            })
+            .then(async res => {
+              const body = await res.json().catch(() => ({}));
+              return { status: res.status, body };
+            })
+            .then(({ status, body }) => {
+              if (status === 200 && body.success) {
+                alertify.success("🗑️ " + (body.message || "Ruta eliminada correctamente"));
+                setTimeout(() => location.reload(), 1000);
+                return;
+              }
+
+              if (status === 409 && body.code === "EN_RECORRIDO") {
+                // Notificar y deshabilitar el botón
+                alertify.error(body.message || "No se puede eliminar: ruta en recorrido.");
+                btnEliminar.disabled = true;
+                btnEliminar.classList.add("disabled");
+                btnEliminar.style.pointerEvents = "none";
+                btnEliminar.title = "No eliminable: ruta en recorrido";
+                return;
+              }
+
+              // Otros errores
+              alertify.error("❌ " + (body.message || "No se pudo eliminar la ruta."));
+            })
+            .catch(err => {
+              console.error(err);
+              alertify.error("❌ Error de conexión al eliminar.");
             });
-        });
-    }
+          },
+          function () {
+            alertify.message("🚫 Eliminación cancelada");
+          }
+        ).set('labels', { ok: 'Eliminar', cancel: 'Cancelar' });
+      });
+    });
+  }
 </script>
 
 
@@ -910,7 +919,7 @@
 
 
 <script async defer
-    src="https://maps.googleapis.com/maps/api/js?key=AIzaSyAABGMtrjdoukcZT2XUBLbtLLgeLRxuZHo&libraries=places&callback=initMap">
+    src="https://maps.googleapis.com/maps/api/js?key=AIzaSyDSIMjL9aM0SdXTLp0w0NiZjAp9NsinKF0&libraries=places&callback=initMap">
     </script>
 
 

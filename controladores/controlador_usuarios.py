@@ -3,28 +3,33 @@ from werkzeug.security import generate_password_hash
 import psycopg2.extras
 def obtener_usuario(dni_usuario):
     conexion = obtener_conexion()
-    usuario = None
     with conexion.cursor(cursor_factory=psycopg2.extras.DictCursor) as cursor:
         cursor.execute(
             """
-            SELECT u.id AS usuario_id, 
-                   u.dni, 
-                   u.pass, 
-                   u.token, 
-                   CONCAT(p.nombre, ' ', p.apellido) AS nombre_completo, 
-                   r.nombre AS rol_nombre, 
-                   COALESCE(p.imagen, '/static/img/default-profile.png') AS imagen,
-                   r.id AS rol_id,
-                   p.id AS persona_id,
-                   p.superusuario  -- agregar aquí
+            SELECT 
+                u.id   AS usuario_id,
+                u.dni,
+                u.pass,
+                u.token,
+                CONCAT(p.nombre, ' ', p.apellido) AS nombre_completo,
+                r.nombre AS rol_nombre,
+                COALESCE(p.imagen, '/static/img/default-profile.png') AS imagen,
+                r.id AS rol_id,
+                p.id AS persona_id,
+                p.superusuario,
+                p.estado    AS persona_estado,    
+                p.eliminado AS persona_eliminado  
             FROM usuarios u
             JOIN personas p ON u.id_persona = p.id
             LEFT JOIN roles r ON p.id_rol = r.id
             WHERE u.dni = %s
-            """, (dni_usuario,))
+            """,
+            (dni_usuario,)
+        )
         usuario = cursor.fetchone()
     conexion.close()
     return usuario
+
 
 
 def obtener_todos_usuarios():

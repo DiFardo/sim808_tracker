@@ -43,8 +43,6 @@ def obtener_permisos_rol(id_rol):
 
 
 def es_superusuario(id_persona):
-    # Esta función puede quedarse para validar si una persona es superusuario,
-    # para permitirle administrar roles y permisos
     conexion = obtener_conexion()
     cursor = conexion.cursor()
     sql = "SELECT superusuario FROM personas WHERE id = %s"
@@ -54,31 +52,23 @@ def es_superusuario(id_persona):
     conexion.close()
     return fila and fila[0] is True
 
-# ======================
-# API para guardar permisos solo por rol
-# ======================
+
 def guardar_permisos_rol():
     data = request.get_json()
-    print("📥 Datos recibidos:", data)  # DEBUG opcional
-
+    print(" Datos recibidos:", data)  
     id_rol = data.get('id_rol')
     permisos = data.get('permisos', [])
-
     if not id_rol or not isinstance(permisos, list):
         return jsonify({'error': 'Datos inválidos'}), 400
-
     conexion = obtener_conexion()
     cursor = conexion.cursor()
-
     try:
-        # Eliminar permisos antiguos del rol
         cursor.execute("DELETE FROM permisos_roles WHERE id_rol = %s", (id_rol,))
 
         sql_insert = """
             INSERT INTO permisos_roles (id_rol, id_modulo, id_opcion, permiso)
             VALUES (%s, %s, %s, %s)
         """
-
         for permiso in permisos:
             tipo = permiso.get('tipo')
             id_modulo = permiso.get('id_modulo')
@@ -90,8 +80,7 @@ def guardar_permisos_rol():
             elif tipo == 'opcion' and id_modulo is not None and id_opcion is not None:
                 cursor.execute(sql_insert, (id_rol, id_modulo, id_opcion, estado_permiso))
             else:
-                continue  # ignora datos incompletos
-
+                continue 
         conexion.commit()
     except Exception as e:
         conexion.rollback()
@@ -100,15 +89,7 @@ def guardar_permisos_rol():
     finally:
         cursor.close()
         conexion.close()
-
     return jsonify({'message': 'Permisos guardados correctamente'})
-
-
-
-
-
-
-
 
 def obtener_modulos_con_opciones():
     conexion = obtener_conexion()

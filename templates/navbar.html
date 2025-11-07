@@ -158,23 +158,27 @@
                                 <span class="align-middle">Rutas programadas</span>
                             </a>
                         </li>
-<!-- 
+
                         <li class="sidebar-item">
-                            <a class="sidebar-link" href="/gestion_productos">
-                                <i class="align-middle" data-feather="alert-triangle"></i>
-                                <span class="align-middle">Alertas</span>
+                            <a class="sidebar-link" href="{{ url_for('historial_rutas') }}">
+                                <i class="align-middle" data-feather="clock"></i>
+                                <span class="align-middle">Historial de rutas</span>
                             </a>
-                        </li> -->
+                        </li>
+
+                        <!-- Sección: Mantenimiento -->
+                        <li class="sidebar-header">Mantenimiento</li>
+
+                        <li class="sidebar-item">
+                            <a class="sidebar-link" href="{{ url_for('mantenimiento') }}">
+                                <i class="align-middle" data-feather="tool"></i>
+                                <span class="align-middle">Mantenimiento</span>
+                            </a>
+                        </li>
+
 
                         <!-- Sección: Herramientas -->
                         <li class="sidebar-header">Herramientas</li>
-<!-- 
-                        <li class="sidebar-item">
-                            <a class="sidebar-link" href="#">
-                                <i class="align-middle" data-feather="bar-chart-2"></i>
-                                <span class="align-middle">Reportes</span>
-                            </a>
-                        </li> -->
 
                         <li class="sidebar-item">
                             <a class="sidebar-link" href="{{ url_for('permisos') }}">
@@ -193,6 +197,7 @@
                     </ul>
                 </div>
             </nav>
+
 
 
 

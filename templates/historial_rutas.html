@@ -1,0 +1,658 @@
+{% extends "pagina_maestra.html" %}
+
+{% block titulo %}Historial de rutas{% endblock %}
+
+{% block link %}
+<link rel="preconnect" href="https://fonts.gstatic.com" />
+<link href="{{ url_for('static', filename='css/app.css') }}" rel="stylesheet" />
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet" />
+<title>Sistema de Monitoreo</title>
+
+<style>
+    /* ===== Breadcrumb: separador y color ===== */
+    .breadcrumb-item+.breadcrumb-item::before {
+        content: "/";
+        color: #8a94a6;
+        padding: 0 .5rem;
+    }
+
+    .breadcrumb .breadcrumb-item a {
+        color: #566a7f;
+        text-decoration: none;
+    }
+
+    .breadcrumb .breadcrumb-item a:hover {
+        color: #0d6efd;
+        text-decoration: underline;
+    }
+
+    /* ===== Card: cabecera con sutil degradado ===== */
+    .card-header {
+        background: linear-gradient(180deg, rgba(246, 248, 252, .9) 0%, rgba(246, 248, 252, 0) 100%);
+        border-bottom: 1px solid #eef2f6;
+    }
+
+    .card-title {
+        font-weight: 600;
+        color: #2a2e34;
+    }
+
+    /* ===== Tabla profesional ===== */
+    .table-responsive {
+        border-radius: .5rem;
+    }
+
+    .table {
+        margin-bottom: 0;
+    }
+
+    .table thead th {
+        font-weight: 600;
+        color: #5b667a;
+        background: #f6f8fc;
+        border-bottom: 1px solid #e6ebf1;
+        white-space: nowrap;
+        position: sticky;
+        top: 0;
+        z-index: 1;
+    }
+
+    .table tbody tr {
+        border-bottom: 1px solid #eef2f6;
+    }
+
+    .table-hover tbody tr:hover {
+        background: #f9fbff;
+    }
+
+    .table tbody tr:nth-child(odd) {
+        background: #fff;
+    }
+
+    .table tbody tr:nth-child(even) {
+        background: #fcfdff;
+    }
+
+    .table td,
+    .table th {
+        vertical-align: middle;
+    }
+
+    .fw-semibold {
+        font-weight: 600;
+    }
+
+    .td-muted {
+        color: #7a8599;
+    }
+
+    /* ===== Badges ===== */
+    .badge {
+        padding: .5rem .75rem;
+        border-radius: 999px;
+        font-weight: 600;
+        letter-spacing: .2px;
+    }
+
+    .badge.bg-warning {
+        background-color: #ffe8b0 !important;
+        color: #6b4e00 !important;
+        border: 1px solid #ffd98a;
+    }
+
+    .badge.bg-success {
+        background-color: #d7f5df !important;
+        color: #0a6c2e !important;
+        border: 1px solid #b9e9c5;
+    }
+
+    /* ===== Empty state ===== */
+    .empty-state {
+        padding: 2.25rem 1rem;
+        color: #8a94a6;
+        font-weight: 500;
+    }
+
+    /* ===== Anchos columnas tabla ===== */
+    .col-conductor {
+        min-width: 220px;
+    }
+
+    .col-asignacion {
+        min-width: 160px;
+    }
+
+    .col-llegada {
+        min-width: 160px;
+    }
+
+    .col-estado {
+        min-width: 140px;
+    }
+
+    .col-vehiculo {
+        min-width: 220px;
+    }
+
+    /* ===== Contenedor ===== */
+    .main-content {
+        padding: 1rem 1.25rem 2rem;
+    }
+
+    /* ===== Cards ===== */
+    .card.flex-fill {
+        border: 1px solid #eef2f6;
+        box-shadow: 0 2px 8px rgba(18, 38, 63, 0.04);
+        border-radius: .75rem;
+        overflow: hidden;
+    }
+
+    /* ===== Filtros ===== */
+    .filters-card .form-label {
+        font-weight: 600;
+        color: #4b5563;
+    }
+
+    .filters-card .btn-run {
+        min-width: 140px;
+    }
+
+    .mini-map {
+        width: 100%;
+        height: 260px;
+        border: 1px dashed #cfd7e3;
+        border-radius: .75rem;
+        background: linear-gradient(135deg, #f7fafc 0%, #f2f6fb 100%);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: #7a8599;
+        font-weight: 600;
+    }
+
+    .mini-map .placeholder {
+        display: flex;
+        align-items: center;
+        gap: .5rem;
+        opacity: .8;
+    }
+
+    .mini-map .placeholder i {
+        width: 18px;
+        height: 18px;
+        display: inline-block;
+        background: #7a8599;
+        mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24' fill='none' stroke='%23ffffff' stroke-width='2' stroke-linecap='round' stroke-linejoin='round' class='feather feather-map-pin'%3E%3Cpath d='M21 10c0 7-9 13-9 13S3 17 3 10a9 9 0 1 1 18 0z'/%3E%3Ccircle cx='12' cy='10' r='3'/%3E%3C/svg%3E") no-repeat center / contain;
+    }
+
+    @media (max-width: 992px) {
+
+        .col-conductor,
+        .col-vehiculo {
+            min-width: 180px;
+        }
+
+        .col-asignacion,
+        .col-llegada,
+        .col-estado {
+            min-width: 140px;
+        }
+    }
+</style>
+{% endblock %}
+
+{% block contenido %}
+<div id="content">
+    <div class="main-content">
+
+        <!-- Breadcrumb dinámico -->
+        <nav aria-label="breadcrumb" class="mb-3">
+            <ol class="breadcrumb">
+                {% for crumb in breadcrumbs %}
+                {% if loop.last %}
+                <li class="breadcrumb-item active" aria-current="page">{{ crumb.name }}</li>
+                {% else %}
+                <li class="breadcrumb-item"><a href="{{ crumb.url }}">{{ crumb.name }}</a></li>
+                {% endif %}
+                {% endfor %}
+            </ol>
+        </nav>
+
+        <!-- ===== Carta: Filtros + Mapa ===== -->
+        <div class="card flex-fill filters-card mb-3">
+            <div class="card-header">
+                <h5 class="card-title mb-0">Filtros y ubicaciones</h5>
+            </div>
+            <div class="card-body">
+                <div class="row g-3">
+                    <!-- Columna izquierda: filtros -->
+                    <div class="col-12 col-lg-5">
+                        <div class="row g-3">
+                            <div class="col-12 col-md-6">
+                                <label for="fDesde" class="form-label">Desde</label>
+                                <input type="date" id="fDesde" class="form-control" />
+                            </div>
+                            <div class="col-12 col-md-6">
+                                <label for="fHasta" class="form-label">Hasta</label>
+                                <input type="date" id="fHasta" class="form-control" />
+                            </div>
+                            <div class="col-12 col-md-6">
+                                <label for="fTexto" class="form-label fw-semibold">Buscar por nombre</label>
+                                <div class="input-group">
+                                    <input type="text" id="fTexto" class="form-control" placeholder="" />
+
+                                    <button type="button" class="btn btn-outline-secondary" id="btnLimpiar">
+                                        Limpiar
+                                    </button>
+                                </div>
+                            </div>
+
+
+                        </div>
+                    </div>
+
+                    <!-- Columna derecha: mini mapa -->
+                    <div class="col-12 col-lg-7">
+                        <!-- Solo diseño; aquí luego va el mapa real (Leaflet/Google/etc.) -->
+                        <div id="miniMap" class="mini-map">
+                            <div class="placeholder">
+                                <i></i>
+                                <span>Mapa (marcará los conductores)</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- ===== Carta: Tabla ===== -->
+        <div class="card flex-fill">
+            <div class="card-header">
+                <h5 class="card-title mb-0">Listado de recorridos</h5>
+            </div>
+            <div class="card-body p-0">
+                <div class="table-responsive">
+                    <table class="table table-hover align-middle mb-0" id="tablaRecorridos">
+
+
+                        <thead>
+                            <tr>
+                                <th class="col-conductor">Conductor</th>
+                                <th class="col-asignacion">Día de asignación</th>
+                                <th class="col-llegada">Fecha de llegada</th>
+                                <th class="col-estado">Estado</th>
+                                <th class="col-vehiculo">Vehículo</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for r in recorridos %}
+                            <tr>
+                                <td class="fw-semibold">{{ r.conductor or '—' }}</td>
+
+                                {# usamos data-asig con valor ISO para filtrar #}
+                                <td class="td-muted" data-asig="{{ r.fecha_asignacion or '' }}">
+                                    {{ r.fecha_asignacion or '—' }}
+                                </td>
+
+                                <td class="td-muted" data-llegada="{{ r.fecha_llegada or '' }}">
+                                    {{ r.fecha_llegada or '—' }}
+                                </td>
+
+                                <td>
+                                    {% set es_activo = (r.estado|string).lower() in ['activa','activo','en curso'] %}
+                                    <span class="badge {{ 'bg-success' if es_activo else 'bg-warning' }}">{{ r.estado or
+                                        '—' }}</span>
+                                </td>
+                                <td>{{ r.vehiculo or '—' }}</td>
+                            </tr>
+                            {% else %}
+                            <tr>
+                                <td colspan="5" class="text-center empty-state">No hay recorridos para mostrar.</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+
+                    </table>
+                </div>
+            </div>
+        </div>
+
+    </div>
+</div>
+{% endblock %}
+
+{% block script %}
+<script>
+    // Normaliza texto (sin tildes, minúsculas)
+    function norm(str) {
+        return (str || "")
+            .toString()
+            .normalize("NFD").replace(/[\u0300-\u036f]/g, "")
+            .toLowerCase()
+            .trim();
+    }
+
+    // yyyy-mm-dd de hoy en zona local
+    function todayISO() {
+        const d = new Date();
+        const y = d.getFullYear();
+        const m = String(d.getMonth() + 1).padStart(2, "0");
+        const day = String(d.getDate()).padStart(2, "0");
+        return `${y}-${m}-${day}`;
+    }
+
+    // Compara fe champ con rango [desde, hasta] inclusive
+    function inRange(fechaISO, desdeISO, hastaISO) {
+        if (!fechaISO) return false;
+        // Comparamos cadenas YYYY-MM-DD lexicográficamente (sirve en este formato)
+        return (!desdeISO || fechaISO >= desdeISO) && (!hastaISO || fechaISO <= hastaISO);
+    }
+
+    function filtrar() {
+        const qNombre = norm(document.getElementById("fTexto")?.value || "");
+        const desdeISO = document.getElementById("fDesde")?.value || "";
+        const hastaISO = document.getElementById("fHasta")?.value || "";
+
+        const rows = document.querySelectorAll("#tablaRecorridos tbody tr");
+
+        rows.forEach(tr => {
+            // No tocar fila de empty-state
+            if (tr.querySelector(".empty-state")) { tr.style.display = ""; return; }
+
+            const tdConductor = tr.querySelector("td:nth-child(1)");
+            const nombre = norm(tdConductor ? tdConductor.textContent : "");
+
+            // Fecha para filtrar: usamos la de asignación
+            const tdAsig = tr.querySelector("td[data-asig]");
+            const fechaAsig = (tdAsig ? tdAsig.getAttribute("data-asig") : "") || "";
+
+            const matchNombre = qNombre === "" || nombre.includes(qNombre);
+            const matchFecha = inRange(fechaAsig.slice(0, 10), desdeISO, hastaISO);
+
+            tr.style.display = (matchNombre && matchFecha) ? "" : "none";
+        });
+    }
+
+
+
+    document.addEventListener("DOMContentLoaded", () => {
+        const fDesde = document.getElementById("fDesde");
+        const fHasta = document.getElementById("fHasta");
+        const fTexto = document.getElementById("fTexto");
+        const btnBus = document.getElementById("btnBuscar");
+        const btnLimp = document.getElementById("btnLimpiar");
+
+        // Setear por defecto HOY en ambos
+        const hoy = todayISO();
+        if (fDesde && !fDesde.value) fDesde.value = hoy;
+        if (fHasta && !fHasta.value) fHasta.value = hoy;
+
+        // Filtrar de inicio
+        filtrar();
+
+        // Búsqueda en tiempo real por nombre
+        if (fTexto) fTexto.addEventListener("input", () => debounce(filtrar, 150));
+        if (fTexto) fTexto.addEventListener("keydown", (e) => {
+            if (e.key === "Enter") { e.preventDefault(); filtrar(); }
+        });
+
+        // Filtrado por fecha (al cambiar cualquiera)
+        if (fDesde) fDesde.addEventListener("change", filtrar);
+        if (fHasta) fHasta.addEventListener("change", filtrar);
+
+        // Botón Buscar (opcional)
+        if (btnBus) btnBus.addEventListener("click", filtrar);
+
+        // Botón Limpiar: borra nombre y resetea fechas a hoy
+        if (btnLimp) btnLimp.addEventListener("click", () => {
+            if (fTexto) fTexto.value = "";
+            const hoy2 = todayISO();
+            if (fDesde) fDesde.value = hoy2;
+            if (fHasta) fHasta.value = hoy2;
+            filtrar();
+            if (fTexto) fTexto.focus();
+        });
+    });
+</script>
+
+<script>
+    // Normaliza texto (quita tildes y pasa a minúsculas)
+    function norm(str) {
+        return (str || "")
+            .toString()
+            .normalize("NFD").replace(/[\u0300-\u036f]/g, "")
+            .toLowerCase()
+            .trim();
+    }
+
+    // Filtra filas por nombre de conductor (primera columna de la tabla)
+    function filtrarPorConductor(query) {
+        const q = norm(query);
+        const rows = document.querySelectorAll("#tablaRecorridos tbody tr");
+
+        rows.forEach(tr => {
+            // Evita tocar la fila de "No hay recorridos..."
+            const emptyCell = tr.querySelector(".empty-state");
+            if (emptyCell) { tr.style.display = ""; return; }
+
+            // Toma la 1ra celda (Conductor) o un .col-conductor si lo prefieres
+            const conductorCell = tr.querySelector("td:nth-child(1)");
+            const texto = norm(conductorCell ? conductorCell.textContent : "");
+
+            const coincide = q === "" || texto.includes(q);
+            tr.style.display = coincide ? "" : "none";
+        });
+    }
+
+    // Debounce simple para no filtrar en cada tecla
+    let debounceId = null;
+    function onInputBuscar(e) {
+        clearTimeout(debounceId);
+        debounceId = setTimeout(() => filtrarPorConductor(e.target.value), 150);
+    }
+
+    // Init
+    document.addEventListener("DOMContentLoaded", () => {
+        const input = document.getElementById("fTexto");
+        const btnBuscar = document.getElementById("btnBuscar");
+        const btnLimpiar = document.getElementById("btnLimpiar");
+
+        if (!input) return;
+
+        // En tiempo real
+        input.addEventListener("input", onInputBuscar);
+
+        // Enter dentro del input
+        input.addEventListener("keydown", (e) => {
+            if (e.key === "Enter") {
+                e.preventDefault();
+                filtrarPorConductor(input.value);
+            }
+        });
+
+        // Botón Buscar (opcional, hace lo mismo)
+        if (btnBuscar) btnBuscar.addEventListener("click", () => filtrarPorConductor(input.value));
+
+        // Botón Limpiar
+        if (btnLimpiar) btnLimpiar.addEventListener("click", () => {
+            input.value = "";
+            filtrarPorConductor("");
+            input.focus();
+        });
+    });
+</script>
+<script>
+  // Exponemos los marcadores desde Flask a JS
+  window.conductorMarkers = {{ conductor_markers|tojson }};
+</script>
+
+<script>
+  let map;
+  let gmMarkers = []; // google.maps.Marker[]
+  let infoWin;        // InfoWindow compartido
+
+function initMap() {
+  const chiclayo = { lat: -6.7714, lng: -79.8409 }; // Chiclayo, PE
+  map = new google.maps.Map(document.getElementById("miniMap"), {
+    center: chiclayo,
+    zoom: 12,
+    mapTypeControl: false,
+    streetViewControl: false,
+    fullscreenControl: false,
+  });
+
+  infoWin = new google.maps.InfoWindow();
+
+  (window.conductorMarkers || []).forEach(addMarker);
+
+  fitBoundsToVisible(chiclayo); // pásale chiclayo como fallback
+}
+
+
+  function addMarker(d) {
+    if (!d || d.lat == null || d.lon == null) return;
+
+    const activo = (d.estado || "").toString().toLowerCase().includes("act");
+    const icon = {
+      path: google.maps.SymbolPath.CIRCLE,
+      scale: 6,
+      fillColor: activo ? "#16a34a" : "#f59e0b", // verde si activo, ámbar si no
+      fillOpacity: 1,
+      strokeColor: "#ffffff",
+      strokeWeight: 2
+    };
+
+    const marker = new google.maps.Marker({
+      position: { lat: Number(d.lat), lng: Number(d.lon) },
+      map,
+      title: d.conductor || d.vehiculo || "Ubicación",
+      icon
+    });
+
+    marker._meta = {
+      conductor: d.conductor || "Sin asignar",
+      vehiculo: d.vehiculo || "",
+      fecha: d.fecha || "",   // YYYY-MM-DD
+      estado: d.estado || "Activa"
+    };
+
+    marker.addListener("click", () => {
+      const m = marker._meta;
+      const html = `
+        <div style="min-width:200px">
+          <div style="font-weight:600">${m.conductor}</div>
+          <div style="color:#6b7280">${m.vehiculo}</div>
+          <div style="color:#6b7280"><small>${m.fecha} • ${m.estado}</small></div>
+        </div>`;
+      infoWin.setContent(html);
+      infoWin.open({ anchor: marker, map });
+    });
+
+    gmMarkers.push(marker);
+  }
+
+function fitBoundsToVisible(fallbackCenter = { lat: -6.7714, lng: -79.8409 }) {
+  const vis = gmMarkers.filter(m => m.getVisible());
+  if (!vis.length) {
+    map.setCenter(fallbackCenter);
+    map.setZoom(12);
+    return;
+  }
+  const bounds = new google.maps.LatLngBounds();
+  vis.forEach(m => bounds.extend(m.getPosition()));
+  map.fitBounds(bounds);
+  if (map.getZoom() > 16) map.setZoom(16);
+}
+
+  function norm(str) {
+    return (str || "")
+      .toString()
+      .normalize("NFD").replace(/[\u0300-\u036f]/g, "")
+      .toLowerCase()
+      .trim();
+  }
+
+  function inRange(fechaISO, desdeISO, hastaISO) {
+    if (!fechaISO) return false;
+    return (!desdeISO || fechaISO >= desdeISO) && (!hastaISO || fechaISO <= hastaISO);
+  }
+
+  function filtrarTablaYMapa() {
+    const qNombre = norm(document.getElementById("fTexto")?.value || "");
+    const desdeISO = document.getElementById("fDesde")?.value || "";
+    const hastaISO = document.getElementById("fHasta")?.value || "";
+
+    // 1) Filtra TABLA
+    const rows = document.querySelectorAll("#tablaRecorridos tbody tr");
+    rows.forEach(tr => {
+      if (tr.querySelector(".empty-state")) { tr.style.display = ""; return; }
+      const nombre = norm(tr.querySelector("td:nth-child(1)")?.textContent || "");
+      const fechaAsig = (tr.querySelector("td[data-asig]")?.getAttribute("data-asig") || "").slice(0,10);
+      const matchNombre = qNombre === "" || nombre.includes(qNombre);
+      const matchFecha  = inRange(fechaAsig, desdeISO, hastaISO);
+      tr.style.display = (matchNombre && matchFecha) ? "" : "none";
+    });
+
+    // 2) Filtra MAPA
+    gmMarkers.forEach(mk => {
+      const m = mk._meta || {};
+      const nombre = norm(m.conductor || "");
+      const fecha  = (m.fecha || "").slice(0,10);
+      const matchNombre = qNombre === "" || nombre.includes(qNombre);
+      const matchFecha  = inRange(fecha, desdeISO, hastaISO);
+      mk.setVisible(matchNombre && matchFecha);
+    });
+
+    fitBoundsToVisible();
+  }
+
+  // Reemplaza tus listeners para que llamen a filtrarTablaYMapa()
+  document.addEventListener("DOMContentLoaded", () => {
+    // Setear fechas por defecto (hoy) si aún no lo hiciste
+    function todayISO() {
+      const d = new Date();
+      return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`;
+    }
+    const fDesde = document.getElementById("fDesde");
+    const fHasta = document.getElementById("fHasta");
+    const fTexto = document.getElementById("fTexto");
+    const btnBuscar = document.getElementById("btnBuscar");
+    const btnLimpiar = document.getElementById("btnLimpiar");
+
+    const hoy = todayISO();
+    if (fDesde && !fDesde.value) fDesde.value = hoy;
+    if (fHasta && !fHasta.value) fHasta.value = hoy;
+
+    // Búsqueda en tiempo real
+    let debounceId = null;
+    function debounce(fn, t=150){ clearTimeout(debounceId); debounceId=setTimeout(fn,t); }
+    if (fTexto) fTexto.addEventListener("input", () => debounce(filtrarTablaYMapa, 150));
+    if (fTexto) fTexto.addEventListener("keydown", (e)=>{ if(e.key==="Enter"){ e.preventDefault(); filtrarTablaYMapa(); } });
+
+    // Fechas
+    if (fDesde) fDesde.addEventListener("change", filtrarTablaYMapa);
+    if (fHasta) fHasta.addEventListener("change", filtrarTablaYMapa);
+
+    // Botones
+    if (btnBuscar) btnBuscar.addEventListener("click", filtrarTablaYMapa);
+    if (btnLimpiar) btnLimpiar.addEventListener("click", () => {
+      if (fTexto) fTexto.value = "";
+      const h = todayISO();
+      if (fDesde) fDesde.value = h;
+      if (fHasta) fHasta.value = h;
+      filtrarTablaYMapa();
+      if (fTexto) fTexto.focus();
+    });
+
+    // Primer filtrado al cargar DOM (antes de que Google Maps termine si hace falta)
+    filtrarTablaYMapa();
+  });
+</script>
+
+<!-- Carga Google Maps con callback -->
+<script async defer
+  src="https://maps.googleapis.com/maps/api/js?key=AIzaSyDSIMjL9aM0SdXTLp0w0NiZjAp9NsinKF0&callback=initMap">
+</script>
+
+
+{% endblock %}

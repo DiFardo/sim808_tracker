@@ -534,6 +534,31 @@ def calcular_duracion(hora_salida, hora_llegada):
         return f"{horas}h {minutos}m"
     except:
         return "-"
+
+# helpers_estado_ruta.py (o donde tengas tus helpers)
+ESTADO_ACTIVA = 'Activa'
+ESTADOS_ENVIO_BLOQUEO = ('vehiculo_iniciar', 'vehiculo_iniciado', 'en_recorrido')
+
+def ruta_en_recorrido(conexion, id_ruta: int) -> bool:
+    """
+    True si la ruta está activa o con estado_envio que implique recorrido.
+    """
+    placeholders = ",".join(["%s"] * len(ESTADOS_ENVIO_BLOQUEO))
+    sql = f"""
+        SELECT 1
+        FROM asignacion_ruta_conductor
+        WHERE id_ruta = %s
+          AND (
+               estado = %s
+               OR estado_envio IN ({placeholders})
+          )
+        LIMIT 1
+    """
+    params = (id_ruta, ESTADO_ACTIVA, *ESTADOS_ENVIO_BLOQUEO)
+    with conexion.cursor() as cur:
+        cur.execute(sql, params)
+        return cur.fetchone() is not None
+
     
 def eliminar_ruta(id_ruta):
     conexion = obtener_conexion()

@@ -9,14 +9,19 @@ import controladores.controlador_vehiculo as controlador_vehiculo
 import controladores.controlador_rutas as controlador_rutas
 import controladores.controlador_index as controlador_index
 import controladores.controlador_permisos as controlador_permisos
+import controladores.controlador_mantenimiento as controlador_mantenimiento
+import controladores.controlador_mantenimiento as cm
+
 from controladores.controlador_permisos import obtener_permisos_rol, tiene_permiso
 from controladores.controlador_index import obtener_flotas_estado, obtener_conductores_en_ruta, dias_con_mas_rutas, obtener_rutas_hoy, obtener_vehiculos_en_ruta, obtener_conductores_activos_con_asignacion
+from werkzeug.security import check_password_hash
 
 from bd_conexion import obtener_conexion
 import requests
 from datetime import datetime
 from datetime import date
 from flask import session
+import psycopg2.extras
 
 import serial
 
@@ -36,17 +41,11 @@ app = Flask(__name__, static_url_path='/static', static_folder='static')
 from flask_jwt_extended import JWTManager
 app.secret_key = 'super-secret'
 app.config['JWT_TOKEN_LOCATION'] = ['cookies']
-app.config['JWT_COOKIE_SECURE'] = False  # Pon True si usas HTTPS
+app.config['JWT_COOKIE_SECURE'] = False 
 app.config['JWT_ACCESS_COOKIE_NAME'] = 'access_token_cookie'
 app.config['JWT_ACCESS_TOKEN_EXPIRES'] = timedelta(hours=2)
-app.config['JWT_COOKIE_CSRF_PROTECT'] = False  # Pon True si usarás CSRF con cookies
+app.config['JWT_COOKIE_CSRF_PROTECT'] = False  
 app.url_map.strict_slashes = False
-
-
-
-
-
-
 def tiene_permiso(permisos, id_modulo=None, id_opcion=None):
     for p in permisos:
         if ((id_modulo is None or p[0] == id_modulo) and
@@ -54,13 +53,8 @@ def tiene_permiso(permisos, id_modulo=None, id_opcion=None):
             p[4] == True):  # p[4] representa el campo 'permiso'
             return True
     return False
-
-
-
 app.jinja_env.globals.update(tiene_permiso=tiene_permiso)
-
 jwt = JWTManager(app)
-
 @app.route('/verificar-conexion')
 def verificar_conexion():
     try:
@@ -69,52 +63,51 @@ def verificar_conexion():
         return jsonify({"estado": "exitoso", "mensaje": "Conexión a la base de datos establecida correctamente."}), 200
     except Exception as e:
         return jsonify({"estado": "error", "mensaje": str(e)}), 500
-    
-# Ruta para la página de inicio de sesión
+def dni_valido(d: str) -> bool:
+    return d.isdigit() and len(d) == 8
 @app.route("/")
 @app.route("/login_user")
 def login():
     resp = make_response(render_template("login_user.html"))
-    unset_jwt_cookies(resp)  # Limpia las cookies previas
+    unset_jwt_cookies(resp) 
     return resp
-
 @app.route("/procesar_login", methods=["POST"])
 def procesar_login():
     try:
-        dni_usuario = request.form["dni_usuario"].strip()
-        password = request.form["password"].strip()
+        dni_usuario = request.form.get("dni_usuario","").strip()
+        password    = request.form.get("password","").strip()
 
+        if not (dni_usuario.isdigit() and len(dni_usuario) == 8):
+            flash("El DNI debe tener 8 dígitos numéricos.", "error")
+            return redirect("/login_user")
         usuario = controlador_usuarios.obtener_usuario(dni_usuario)
-
         if not usuario:
-            flash("Usuario no encontrado.")
+            flash("Usuario no encontrado.", "error")
+            return redirect("/login_user")
+        if usuario.get("persona_eliminado") is True:
+            flash("Tu usuario fue eliminado. Contacta al administrador.", "error")
+            return redirect("/login_user")
+        if usuario.get("persona_estado") is not True:
+            flash("Tu usuario está inactivo. Contacta al administrador.", "error")
             return redirect("/login_user")
 
-        # ✅ Usa claves del DictCursor correctamente
-        hash_guardado = usuario["pass"]
-        id_persona    = usuario["persona_id"]
-        rol_nombre    = usuario["rol_nombre"]
-        rol_id        = usuario["rol_id"]
-
-        if check_password_hash(hash_guardado, password):
-            # ✅ Guarda info relevante en sesión
-            session['rol']         = rol_nombre
-            session['rol_id']      = rol_id
-            session['dni_usuario'] = dni_usuario
-            session['id_persona']  = id_persona
-
-            access_token = create_access_token(identity=dni_usuario)
-            resp = make_response(redirect("/index"))
-            set_access_cookies(resp, access_token)
-
-            return resp
-        else:
-            flash("Contraseña incorrecta.")
+        if not check_password_hash(usuario["pass"], password):
+            flash("Contraseña incorrecta.", "error")
             return redirect("/login_user")
+        session['rol']         = usuario["rol_nombre"]
+        session['rol_id']      = usuario["rol_id"]
+        session['dni_usuario'] = dni_usuario
+        session['id_persona']  = usuario["persona_id"]
+
+        access_token = create_access_token(identity=dni_usuario)
+        resp = make_response(redirect("/index"))
+        set_access_cookies(resp, access_token)
+        return resp
 
     except Exception as e:
-        flash(f"Ocurrió un error: {str(e)}")
+        flash(f"Ocurrió un error: {str(e)}", "error")
         return redirect("/login_user")
+
 
 
 
@@ -164,71 +157,69 @@ def permisos():
         return "Acceso denegado", 403
     
     usuarios = controlador_usuarios.obtener_todos_usuarios()
-    return render_template("permisos.html", usuario=usuario, usuarios=usuarios)
+
+    # Breadcrumb simple: Inicio / Permisos
+    breadcrumbs = [
+        {"name": "Inicio", "url": url_for("index")},
+        {"name": "Permisos", "url": url_for("permisos")}
+    ]
+
+    return render_template(
+        "permisos.html",
+        usuario=usuario,
+        usuarios=usuarios,
+        breadcrumbs=breadcrumbs
+    )
+
+
 
 @app.route("/api/roles")
 @jwt_required()
 def api_roles():
     dni_usuario = get_jwt_identity()
     usuario = controlador_usuarios.obtener_usuario(dni_usuario)
-
     if not usuario or not usuario.get('superusuario', False):
         return jsonify({"error": "Acceso denegado"}), 403
-
     roles = controlador_usuarios.obtener_roles_activos()
     roles_json = [{"id": r["id"], "nombre": r["nombre"]} for r in roles]
-
     return jsonify(roles_json)
-
 @app.route("/api/permisos-rol/<int:id_rol>")
 @jwt_required()
 def api_permisos_rol(id_rol):
     dni_usuario = get_jwt_identity()
     usuario_actual = controlador_usuarios.obtener_usuario(dni_usuario)
-
     if not usuario_actual or not usuario_actual.get('superusuario', False):
         return jsonify({"error": "Acceso denegado"}), 403
-
     resultados = controlador_permisos.obtener_permisos_rol(id_rol)
-
     permisos_rol = []
     for fila in resultados:
         permisos_rol.append({
             "id_modulo": fila[0],
             "modulo_nombre": fila[1],
-            "id_opcion": fila[2],  # Puede ser None
-            "opcion_nombre": fila[3],  # Puede ser None
+            "id_opcion": fila[2], 
+            "opcion_nombre": fila[3],  
             "permiso": fila[4]
         })
-
     return jsonify({
         "permisos_rol": permisos_rol
     })
-
 
 @app.route("/api/guardar-permisos-rol", methods=["POST"])
 @jwt_required()
 def api_guardar_permisos_rol():
     dni_usuario = get_jwt_identity()
     usuario_actual = controlador_usuarios.obtener_usuario(dni_usuario)
-
     if not usuario_actual or not usuario_actual.get('superusuario', False):
         return jsonify({"error": "Acceso denegado"}), 403
-
     return controlador_permisos.guardar_permisos_rol()
-
 @app.route('/api/modulos-opciones')
 @jwt_required()
 def api_modulos_opciones():
     dni_usuario = get_jwt_identity()
     usuario = controlador_usuarios.obtener_usuario(dni_usuario)
-
-    # Solo superusuario puede acceder (si es tu política)
     if not usuario or not usuario.get('superusuario', False):
         return jsonify({"error": "Acceso denegado"}), 403
-
     modulos = controlador_permisos.obtener_modulos_con_opciones()
-
     return jsonify(modulos)
 
 
@@ -351,13 +342,23 @@ def vehiculos():
 
     vehiculos = obtener_vehiculos()
 
-    return render_template("vehiculos.html",
-                           usuario=usuario,
-                           vehiculos=vehiculos,
-                           mostrar_boton_añadir=mostrar_boton_añadir,
-                           mostrar_icono_editar=mostrar_icono_editar,
-                           mostrar_icono_eliminar=mostrar_icono_eliminar,
-                           mostrar_selector_estado=mostrar_selector_estado)
+    # Breadcrumb simple: Inicio / Vehículos
+    breadcrumbs = [
+        {"name": "Inicio", "url": url_for("index")},
+        {"name": "Vehículos", "url": url_for("vehiculos")}
+    ]
+
+    return render_template(
+        "vehiculos.html",
+        usuario=usuario,
+        vehiculos=vehiculos,
+        mostrar_boton_añadir=mostrar_boton_añadir,
+        mostrar_icono_editar=mostrar_icono_editar,
+        mostrar_icono_eliminar=mostrar_icono_eliminar,
+        mostrar_selector_estado=mostrar_selector_estado,
+        breadcrumbs=breadcrumbs
+    )
+
 
 
 
@@ -380,8 +381,6 @@ def api_registrar_vehiculo():
         marca = request.form.get("marca")
         anio = request.form.get("anio")
         imagen = request.files.get("imagen")
-
-        # Validación básica
         if not placa or not modelo or not marca or not anio:
             return jsonify({"success": False, "message": "Faltan datos obligatorios"}), 400
 
@@ -391,6 +390,7 @@ def api_registrar_vehiculo():
 
     except Exception as e:
         return jsonify({"success": False, "message": f"Error inesperado: {str(e)}"}), 500
+
 
 
 @app.route("/api/vehiculo/<int:id_vehiculo>", methods=["PUT"])
@@ -435,11 +435,18 @@ def api_obtener_vehiculo_por_id(id_vehiculo):
 @jwt_required()
 def api_eliminar_vehiculo(id_vehiculo):
     try:
-        success, message = controlador_vehiculo.eliminar_vehiculo(id_vehiculo)
-        status_code = 200 if success else 400
-        return jsonify({"success": success, "message": message}), status_code
+        ok, msg = controlador_vehiculo.eliminar_vehiculo(id_vehiculo)
+        if ok:
+            return jsonify({"success": True, "message": msg}), 200
+
+        # Si el backend mandó nuestro código semántico, responde 409
+        if isinstance(msg, str) and msg.startswith("NO_PERMITIDO_EN_RECORRIDO"):
+            return jsonify({"success": False, "message": "El vehículo está en recorrido y no puede eliminarse."}), 409
+
+        return jsonify({"success": False, "message": msg}), 500
     except Exception as e:
         return jsonify({"success": False, "message": f"Error inesperado: {str(e)}"}), 500
+
 
 
 @app.route("/mapa_flotas")
@@ -614,22 +621,16 @@ def ubicacion_actual():
 def api_asignar_ruta():
     try:
         data = request.form
-
-        # 1️⃣ Datos obligatorios
         id_vehiculo = int(data.get("vehiculo"))
         destino_completo = data.get("destino")
         destino_coords = data.get("destino_coords")
         fecha = date.today().isoformat()  # Usar fecha actual del servidor
-
         if not all([id_vehiculo, destino_completo, destino_coords]):
             return jsonify({"success": False, "message": "Faltan campos requeridos"}), 400
-
         try:
             destino_lat, destino_lon = map(float, destino_coords.split(","))
         except Exception:
             return jsonify({"success": False, "message": "Coordenadas de destino inválidas"}), 400
-
-        # 2️⃣ Puntos de recojo (opcional)
         puntos_importantes = None
         puntos_json = data.get("puntos_importantes")
         if puntos_json:
@@ -638,8 +639,6 @@ def api_asignar_ruta():
                 puntos_importantes = json.loads(puntos_json)
             except Exception:
                 return jsonify({"success": False, "message": "Formato de puntos importantes inválido"}), 400
-
-        # 3️⃣ Guardar usando tu lógica
         success, msg, id_ruta = controlador_rutas.registrar_ruta_solo_con_vehiculo(
             id_vehiculo=id_vehiculo,
             destino=destino_completo,
@@ -648,8 +647,6 @@ def api_asignar_ruta():
             fecha=fecha,
             puntos_importantes=puntos_importantes
         )
-
-        # ✅ Si se guardó, recupera los puntos reales para devolverlos
         puntos_guardados = []
         if success:
             conexion = obtener_conexion()
@@ -670,11 +667,7 @@ def api_asignar_ruta():
                         })
             finally:
                 conexion.close()
-
-        # 4️⃣ Vehículo para mostrar
         vehiculo = controlador_rutas.obtener_vehiculo_por_id(id_vehiculo)
-
-        # 5️⃣ Respuesta final
         if success:
             return jsonify({
                 "success": True,
@@ -687,7 +680,7 @@ def api_asignar_ruta():
                     "lon": destino_lon,
                     "vehiculo": f"{vehiculo['modelo']} - {vehiculo['placa']}" if vehiculo else "N/D",
                     "vehiculo_id": id_vehiculo,
-                    "puntos_importantes": puntos_guardados  # 👉 Ahora SÍ se devuelven
+                    "puntos_importantes": puntos_guardados  
                 }
             }), 200
         else:
@@ -731,7 +724,15 @@ def registrar_desvio():
 @app.route("/api/ruta/<int:id_ruta>", methods=["DELETE"])
 @jwt_required()
 def eliminar_ruta_api(id_ruta):
+    con = obtener_conexion()
     try:
+        if controlador_rutas.ruta_en_recorrido(con, id_ruta):
+            return jsonify({
+                "success": False,
+                "code": "EN_RECORRIDO",
+                "message": "No se puede eliminar: la ruta está en recorrido/activa."
+            }), 409
+
         success, msg = controlador_rutas.eliminar_ruta(id_ruta)
         if success:
             return jsonify({"success": True, "message": msg}), 200
@@ -739,6 +740,8 @@ def eliminar_ruta_api(id_ruta):
             return jsonify({"success": False, "message": msg}), 500
     except Exception as e:
         return jsonify({"success": False, "message": str(e)}), 500
+    finally:
+        con.close()
     
 
 
@@ -926,14 +929,11 @@ def marcar_ruta_activa():
 
         conexion = obtener_conexion()
         with conexion.cursor() as cursor:
-            # Limpiar cualquier ruta que ya esté marcada para el SIM
             cursor.execute("""
                 UPDATE asignacion_ruta_conductor
                 SET estado_envio = NULL
                 WHERE estado_envio = 'vehiculo_iniciar';
             """)
-
-            # Establecer esta ruta como la que debe iniciar el SIM
             cursor.execute("""
                 UPDATE asignacion_ruta_conductor
                 SET estado_envio = 'vehiculo_iniciar'
@@ -949,7 +949,6 @@ def marcar_ruta_activa():
 
     finally:
         conexion.close()
-
 @app.route("/api/estado-ruta/<int:id_ruta>", methods=["GET"])
 def verificar_estado_ruta(id_ruta):
     try:
@@ -1007,49 +1006,43 @@ def formatear_rutas_hora_lima(rutas):
 
 @app.route("/api/registrar_origen_gps", methods=["POST"], strict_slashes=False)
 def registrar_origen_gps():
-    print("📥 Headers recibidos:")
+    print(" Headers recibidos:")
     for key, value in request.headers.items():
         print(f"{key}: {value}")
 
-    print("\n📥 Cuerpo crudo recibido (request.data):")
+    print("\nCuerpo crudo recibido (request.data):")
     print(request.data)
 
     try:
         raw = request.data.decode("utf-8").replace('\x1a', '')
         data = json.loads(raw)
     except Exception as e:
-        print("❌ No se pudo procesar el JSON:", e)
+        print(" No se pudo procesar el JSON:", e)
         return jsonify({"error": "JSON inválido"}), 400
 
-    print("📦 Payload recibido:", data)
-
+    print(" Payload recibido:", data)
     try:
         id_ruta = int(data.get("id_ruta"))
         lat = float(data.get("lat"))
         lon = float(data.get("lon"))
         hora_str = data.get("hora", "").strip()
-
         if not hora_str:
             return jsonify({"error": "Campo 'hora' es obligatorio"}), 400
-
         if len(hora_str) < 14:
             return jsonify({"error": "Formato de hora incompleto"}), 400
 
         hora_sim = datetime.strptime(hora_str[:14], "%Y%m%d%H%M%S")
         hora_utc = utc.localize(hora_sim)
         hora_lima = hora_utc.astimezone(timezone("America/Lima"))
-
     except Exception as e:
-        print("❌ Error procesando datos:", e)
+        print(" Error procesando datos:", e)
         return jsonify({"error": "Datos inválidos"}), 400
-
     try:
         direccion = obtener_direccion_desde_coordenadas(lat, lon)
         if not isinstance(direccion, str):
             direccion = str(direccion)
-        direccion_corta = direccion.strip()[:100]  # MÁXIMO 100 caracteres
-
-        print("📍 Dirección geocodificada:", direccion_corta)
+        direccion_corta = direccion.strip()[:100]  
+        print(" Dirección geocodificada:", direccion_corta)
 
         conexion = obtener_conexion()
         with conexion.cursor() as cursor:
@@ -1069,7 +1062,7 @@ def registrar_origen_gps():
             """, (id_ruta,))
 
         conexion.commit()
-        print(f"✅ Origen y estado_envio actualizados para ruta {id_ruta}")
+        print(f"Origen y estado_envio actualizados para ruta {id_ruta}")
         return jsonify({
             "success": True,
             "message": "Origen actualizado correctamente",
@@ -1078,7 +1071,7 @@ def registrar_origen_gps():
 
     except Exception as e:
         conexion.rollback()
-        print("❌ Error al actualizar en BD:", e)
+        print(" Error al actualizar en BD:", e)
         return jsonify({"success": False, "message": str(e)}), 500
     finally:
         conexion.close()
@@ -1228,6 +1221,167 @@ def obtener_ultima_ubicacion():
         conexion.close()
 
 
+@app.route("/historial_rutas")
+@jwt_required()
+def historial_rutas():
+    dni_usuario = get_jwt_identity()
+    usuario = controlador_usuarios.obtener_usuario(dni_usuario)
+
+    breadcrumbs = [
+        {"name": "Inicio", "url": url_for("index")},
+        {"name": "Historial de Rutas", "url": url_for("historial_rutas")}
+    ]
+
+    # Tabla (ya la tienes)
+    q_tabla = """
+    SELECT
+      rp.id AS id_ruta,
+      NULLIF(TRIM(COALESCE(p.nombre,'') || ' ' || COALESCE(p.apellido,'')), '') AS conductor_raw,
+      COALESCE(CONCAT(v.modelo, ' - ', v.placa), '') AS vehiculo_raw,
+      COALESCE(arc.fecha_asignacion::text, rp.fecha::text) AS fecha_asignacion_raw,
+      rp.hora_llegada::text AS fecha_llegada_raw,
+      COALESCE(arc.estado, 'Activa') AS estado_raw
+    FROM rutas_programadas rp
+    LEFT JOIN asignacion_ruta_conductor arc ON arc.id_ruta = rp.id
+    LEFT JOIN personas p  ON p.id = arc.id_persona
+    LEFT JOIN vehiculos v ON v.id = arc.id_vehiculo
+    ORDER BY rp.fecha DESC, rp.id DESC;
+    """
+
+    # Marcadores para el mapa (última ubicación o el origen)
+    q_marcadores = """
+    SELECT
+      rp.id AS id_ruta,
+      NULLIF(TRIM(COALESCE(p.nombre,'') || ' ' || COALESCE(p.apellido,'')), '')   AS conductor,
+      COALESCE(v.modelo || ' - ' || v.placa, '')                                   AS vehiculo,
+      COALESCE(arc.estado, 'Activa')                                               AS estado,
+      TO_CHAR(COALESCE(arc.fecha_asignacion, rp.fecha), 'YYYY-MM-DD')              AS fecha,
+      COALESCE(ur.lat, rp.origen_lat)                                              AS lat,
+      COALESCE(ur.lon, rp.origen_lon)                                              AS lon
+    FROM rutas_programadas rp
+    LEFT JOIN asignacion_ruta_conductor arc ON arc.id_ruta = rp.id
+    LEFT JOIN personas p  ON p.id = arc.id_persona
+    LEFT JOIN vehiculos v ON v.id = arc.id_vehiculo
+    LEFT JOIN LATERAL (
+        SELECT lat, lon
+        FROM ubicaciones_ruta u
+        WHERE u.id_ruta = rp.id
+        ORDER BY u.hora DESC
+        LIMIT 1
+    ) ur ON TRUE
+    ORDER BY rp.fecha DESC, rp.id DESC;
+    """
+
+    con = obtener_conexion()
+    cur = con.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+
+    # Tabla
+    cur.execute(q_tabla)
+    rows = cur.fetchall()
+    recorridos = []
+    for r in rows:
+        recorridos.append({
+            "conductor": r["conductor_raw"] or "Sin asignar",
+            "vehiculo":  r["vehiculo_raw"] or "Sin asignar",
+            "fecha_asignacion": r["fecha_asignacion_raw"] or "",
+            "fecha_llegada":    r["fecha_llegada_raw"] or "",
+            "estado":           r["estado_raw"] or "Activa",
+        })
+
+    # Marcadores
+    cur.execute(q_marcadores)
+    conductor_markers = cur.fetchall()
+
+    cur.close(); con.close()
+
+    return render_template(
+        "historial_rutas.html",
+        usuario=usuario,
+        breadcrumbs=breadcrumbs,
+        recorridos=recorridos,
+        conductor_markers=conductor_markers  # <<--- para el mapa
+    )
+# ruta para mantenimiento 
+
+# ========== VISTA ==========
+@app.route("/mantenimiento")
+@jwt_required()
+def mantenimiento():
+    dni_usuario = get_jwt_identity()
+    usuario = controlador_usuarios.obtener_usuario(dni_usuario)
+
+    breadcrumbs = [
+        {"name": "Inicio", "url": url_for("index")},
+        {"name": "Mantenimiento de Vehículos", "url": url_for("mantenimiento")}
+    ]
+
+    # Para el selector de vehículo en la vista
+    vehiculos = cm.obtener_vehiculos_min()
+
+    return render_template(
+        "mantenimiento.html",
+        usuario=usuario,
+        breadcrumbs=breadcrumbs,
+        vehiculos=vehiculos
+    )
+
+# ========== API UI (carga por vehículo) ==========
+@app.route("/api/mantenimiento/<int:vehiculo_id>/ui")
+@jwt_required()
+def api_mantenimiento_ui(vehiculo_id):
+    # Dispara alertas antes de devolver (opcional)
+    cm.disparar_alertas_preventivas(vehiculo_id)
+    cm.disparar_alertas_predictivas(vehiculo_id)
+
+    data = {
+    "cabecera": cm.obtener_cabecera_calculos(vehiculo_id),
+    "alertas_conf": cm.obtener_alertas_conf(vehiculo_id),
+    "combustible": cm.obtener_cargas_combustible(vehiculo_id),
+    "por_horas": cm.obtener_por_horas(vehiculo_id),  # ← devolverá []
+    "por_km": cm.obtener_por_km(vehiculo_id),
+    "por_tiempo": cm.obtener_por_tiempo(vehiculo_id),
+    "alertas_activas": cm.obtener_alertas_activas(vehiculo_id)
+}
+
+    return jsonify({"ok": True, "data": data})
+
+# ========== API: crear/cerrar OT ==========
+@app.route("/api/mantenimiento/ot", methods=["POST"])
+@jwt_required()
+def api_crear_ot():
+    j = request.get_json() or {}
+    vehiculo_id = int(j.get("vehiculo_id"))
+    nro_ot = str(j.get("nro_ot"))
+    niveles = j.get("niveles")  # ej. "2, 1"
+    ot_id = cm.crear_ot(vehiculo_id, nro_ot, niveles)
+    return jsonify({"ok": True, "ot_id": ot_id})
+
+@app.route("/api/mantenimiento/ot/<int:ot_id>/cerrar", methods=["POST"])
+@jwt_required()
+def api_cerrar_ot(ot_id):
+    cm.cerrar_ot(ot_id)
+    return jsonify({"ok": True})
+
+# ========== API: sensores (push) ==========
+@app.route("/api/sensores/push", methods=["POST"])
+@jwt_required()
+def api_push_sensor():
+    j = request.get_json() or {}
+    vehiculo_id = int(j.get("vehiculo_id"))
+    clave = str(j.get("clave"))             # p.ej. "vibracion_motor"
+    valor = float(j.get("valor"))
+    cm.insertar_lectura_sensor(vehiculo_id, clave, valor)
+    # Opcional: disparar predictivo al vuelo
+    cm.disparar_alertas_predictivas(vehiculo_id)
+    return jsonify({"ok": True})
+
+# ========== API: forzar disparo de alertas ==========
+@app.route("/api/mantenimiento/<int:vehiculo_id>/alertas/disparar", methods=["POST"])
+@jwt_required()
+def api_disparar_alertas(vehiculo_id):
+    cm.disparar_alertas_preventivas(vehiculo_id)
+    cm.disparar_alertas_predictivas(vehiculo_id)
+    return jsonify({"ok": True})
 
 
 if __name__ == "__main__":

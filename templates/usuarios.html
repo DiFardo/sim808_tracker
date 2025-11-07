@@ -9,6 +9,8 @@
 <link rel="stylesheet" href="{{ url_for('static', filename='css/custom.css') }}">
 <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css" rel="stylesheet">
 <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
+<link rel="stylesheet" href="//cdn.jsdelivr.net/npm/alertifyjs@1.13.1/build/css/alertify.min.css" />
+<link rel="stylesheet" href="//cdn.jsdelivr.net/npm/alertifyjs@1.13.1/build/css/themes/default.min.css" />
 
 <style>
     table thead.table-dark th {
@@ -337,64 +339,103 @@
     }
 </script>
 <!-- AÑADIR USUARIO-->
-
 <script>
-    document.getElementById("formCrearUsuario").addEventListener("submit", function (e) {
-        e.preventDefault();
+(function () {
+  const form = document.getElementById("formCrearUsuario");
+  const btn  = document.getElementById("btnGuardarUsuario");
 
-        const form = this;
-        const action = document.getElementById("btnGuardarUsuario").getAttribute("data-action");
-        const idUsuario = form.getAttribute("data-id") || null;
+  function esErrorDniDuplicado(msg) {
+    if (!msg) return false;
+    const s = String(msg).toLowerCase();
+    // MySQL/MariaDB
+    if (s.includes('1062') || s.includes('duplicate entry')) return true;
+    // PostgreSQL
+    if (s.includes('duplicate key value') || s.includes('unique constraint')) return true;
+    // SQL Server
+    if (s.includes('violation of unique key') || s.includes('uq_')) return true;
+    // Mensajes custom
+    if (s.includes('dni ya está registrado') || s.includes('dni duplicado')) return true;
+    return false;
+  }
 
-        const nombre = document.getElementById("nombreUsuario").value.trim();
-        const apellido = document.getElementById("apellidosUsuario").value.trim();
-        const dni = document.getElementById("dniUsuario").value.trim();
-        const password = document.getElementById("passUsuario").value.trim();
-        const rol_id = document.getElementById("rolUsuario").value;
-        const estado = document.getElementById("estadoUsuario").value;
+  function bloquear(b) {
+    if (!btn) return;
+    btn.disabled = b;
+    btn.dataset.originalText = btn.dataset.originalText || btn.innerText;
+    btn.innerText = b ? "Guardando..." : btn.dataset.originalText;
+  }
 
-        if (!nombre || !apellido || !dni || !rol_id || !estado || (action === "registrar" && !password)) {
-            alert("Por favor complete todos los campos.");
-            return;
-        }
+  form.addEventListener("submit", async function (e) {
+    e.preventDefault();
 
-        const payload = {
-            nombre: nombre,
-            apellido: apellido,
-            dni: dni,
-            rol_id: rol_id,
-            estado: estado
-        };
+    const action   = btn.getAttribute("data-action");
+    const idUsuario = form.getAttribute("data-id") || null;
 
-        if (password) {
-            payload.password = password;
-        }
+    const nombre   = document.getElementById("nombreUsuario").value.trim();
+    const apellido = document.getElementById("apellidosUsuario").value.trim();
+    const dni      = document.getElementById("dniUsuario").value.trim();
+    const password = document.getElementById("passUsuario").value.trim();
+    const rol_id   = document.getElementById("rolUsuario").value;
+    const estado   = document.getElementById("estadoUsuario").value;
 
-        const url = action === "editar" ? `/api/usuarios/${idUsuario}` : "/api/usuarios";
-        const method = action === "editar" ? "PUT" : "POST";
+    // Validaciones mínimas
+    if (!nombre || !apellido || !dni || !rol_id || !estado || (action === "registrar" && !password)) {
+      alertify.message("📝 Completa todos los campos requeridos.");
+      return;
+    }
+    if (!/^\d{8}$/.test(dni)) {
+      alertify.message("🔎 DNI inválido: deben ser 8 dígitos.");
+      return;
+    }
 
-        fetch(url, {
-            method: method,
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify(payload)
-        })
-            .then(res => res.json())
-            .then(data => {
-                if (data.success) {
-                    alert(data.message);
-                    document.getElementById("formCrearUsuario").reset();
-                    const modal = bootstrap.Modal.getInstance(document.getElementById("modalCrearUsuario"));
-                    modal.hide();
-                    setTimeout(() => location.reload(), 1000);
-                } else {
-                    alert("Error: " + data.message);
-                }
-            })
-            .catch(err => {
-                console.error(err);
-                alert("Error al procesar la solicitud.");
-            });
-    });
+    const payload = {
+      nombre,
+      apellido,
+      dni,
+      rol_id,   // si tu API espera int, puedes hacer: parseInt(rol_id, 10)
+      estado    // si tu API espera 'activo'/'inactivo' está bien; si es boolean, conviértelo aquí
+    };
+    if (password) payload.password = password;
+
+    const url    = action === "editar" ? `/api/usuarios/${idUsuario}` : "/api/usuarios";
+    const method = action === "editar" ? "PUT" : "POST";
+
+    try {
+      bloquear(true);
+      const res = await fetch(url, {
+        method,
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload)
+      });
+
+      // Intenta leer JSON incluso si es 4xx/5xx
+      let data = null;
+      try { data = await res.json(); } catch { data = { success:false, message: await res.text() }; }
+
+      if (res.ok && data && data.success) {
+        alertify.success("✅ " + (data.message || "Usuario guardado correctamente"));
+        form.reset();
+        const modal = bootstrap.Modal.getInstance(document.getElementById("modalCrearUsuario"));
+        if (modal) modal.hide();
+        setTimeout(() => location.reload(), 800);
+        return;
+      }
+
+      // Errores controlados por API o 4xx
+      const msg = (data && data.message) ? data.message : "Error al registrar/actualizar.";
+      if (esErrorDniDuplicado(msg)) {
+        alertify.message("🚫 DNI duplicado: ya existe un usuario con ese documento");
+      } else {
+        alertify.error("❌ " + msg);
+      }
+    } catch (err) {
+      console.error(err);
+      alertify.error("❌ Error de red o del servidor");
+    } finally {
+      bloquear(false);
+    }
+  });
+})();
 </script>
 
 <script>
@@ -491,7 +532,8 @@
     }
 </script>
 
-
+<!-- JS de Alertify.js -->
+<script src="https://cdn.jsdelivr.net/npm/alertifyjs@1.13.1/build/alertify.min.js"></script>
 
 
 
