@@ -11,7 +11,6 @@ import controladores.controlador_index as controlador_index
 import controladores.controlador_permisos as controlador_permisos
 import controladores.controlador_mantenimiento as controlador_mantenimiento
 import controladores.controlador_mantenimiento as cm
-from flask_wtf import CSRFProtect
 from controladores.controlador_permisos import obtener_permisos_rol, tiene_permiso
 from controladores.controlador_index import obtener_flotas_estado, obtener_conductores_en_ruta, dias_con_mas_rutas, obtener_rutas_hoy, obtener_vehiculos_en_ruta, obtener_conductores_activos_con_asignacion
 from werkzeug.security import check_password_hash
