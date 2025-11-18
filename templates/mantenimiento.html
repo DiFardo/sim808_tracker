@@ -1,6 +1,6 @@
 {% extends "pagina_maestra.html" %}
 
-{% block titulo %}Mantenimiento predictivo y preventivo{% endblock %}
+{% block titulo %}Módulo de mantenimiento preventivo{% endblock %}
 
 {% block link %}
 <link rel="preconnect" href="https://fonts.gstatic.com" />
@@ -17,7 +17,7 @@
     <div class="card mb-3">
       <div class="card-body">
         <div class="row g-3 align-items-end">
-          <div class="col-12 col-lg-3">
+          <div class="col-12 col-lg-4">
             <label class="form-label mb-1">Vehículo</label>
             <select id="vehiculoSelect" class="form-select">
               {% for v in vehiculos %}
@@ -25,14 +25,22 @@
               {% endfor %}
             </select>
           </div>
-          <div class="col-12 col-md-3">
-            <label class="form-label mb-1">Matrícula vehículo</label>
-            <input id="filtroPlaca" type="text" class="form-control" placeholder="Ej. ABC-123">
+
+          <div class="col-12 col-md-4">
+            <label class="form-label mb-1">Buscar por matrícula</label>
+            <input id="filtroPlaca" type="text" class="form-control" placeholder="Ej. C7R-891">
           </div>
-          <div class="col-12 col-md-3 ms-auto text-md-end">
-            <button id="btnBuscar" class="btn btn-primary">Buscar</button>
+
+          <div class="col-12 col-md-4 text-md-end">
+            <button id="btnBuscar" class="btn btn-primary me-2">Buscar</button>
             <button id="btnLimpiar" class="btn btn-outline-secondary">Limpiar</button>
           </div>
+        </div>
+
+        <div class="small text-muted mt-2">
+          Este módulo calcula el <b>mantenimiento preventivo</b> a partir del
+          <b>kilometraje</b> y el <b>uso real del vehículo</b> (km/día), y estima
+          la fecha del próximo servicio.
         </div>
       </div>
     </div>
@@ -41,58 +49,65 @@
     <div class="card">
       <div class="card-header">
         <div class="d-flex justify-content-between align-items-center">
-          <h6 class="mb-0">Alertas (vencimientos)</h6>
+          <div>
+            <h6 class="mb-0">Alertas del vehículo (documentación y mantenimiento)</h6>
+            <small class="text-muted">
+              Completa las fechas de vencimiento para que el sistema dispare alertas.
+            </small>
+          </div>
           <span class="small text-muted" id="vehInfo"></span>
         </div>
 
         <!-- Alertas en fila horizontal -->
-        <div class="row g-2 mt-2">
+        <div class="row g-2 mt-3">
           <div class="col-12 col-md-3">
-            <label class="form-label mb-1">Seguro / F. venc</label>
+            <label class="form-label mb-1">Seguro – Fecha de vencimiento</label>
             <input id="seguroVenc" type="date" class="form-control form-control-sm">
           </div>
           <div class="col-12 col-md-3">
-            <label class="form-label mb-1">Técnica / F. venc</label>
+            <label class="form-label mb-1">Revisión técnica – Fecha de vencimiento</label>
             <input id="tecnicaVenc" type="date" class="form-control form-control-sm">
           </div>
           <div class="col-12 col-md-3">
-            <label class="form-label mb-1">Ruta / F. venc</label>
+            <label class="form-label mb-1">Permiso de ruta – Fecha de vencimiento</label>
             <input id="rutaVenc" type="date" class="form-control form-control-sm">
           </div>
           <div class="col-12 col-md-3">
-            <label class="form-label mb-1">Matafuego / F. venc</label>
+            <label class="form-label mb-1">Matafuego – Fecha de vencimiento</label>
             <input id="matafuegoVenc" type="date" class="form-control form-control-sm">
           </div>
         </div>
 
-        <div class="d-flex gap-2 mt-3">
+        <div class="d-flex flex-wrap gap-2 mt-3">
           <button id="btnGuardarAlertas" class="btn btn-primary btn-sm">Guardar vencimientos</button>
-          <button id="btnDisparar" class="btn btn-outline-secondary btn-sm">Recalcular alertas</button>
+          <button id="btnDisparar" class="btn btn-outline-secondary btn-sm">
+            Recalcular alertas de mantenimiento
+          </button>
         </div>
 
-        <!-- Leyenda -->
+        <!-- Leyenda para interpretación de colores -->
         <div class="small mt-3">
-          <span class="me-3"><span class="badge bg-danger">&nbsp;</span> Fuera Límite</span>
-          <span class="me-3"><span class="badge bg-warning">&nbsp;</span> &lt; 100 Horas/Km</span>
-          <span class="me-3"><span class="badge bg-info">&nbsp;</span> &lt; 50 Horas/Km</span>
-          <span><span class="badge bg-success">&nbsp;</span> MP en curso</span>
+          <span class="me-3"><span class="badge bg-danger">&nbsp;</span> Servicio vencido / superó km programado</span>
+          <span class="me-3"><span class="badge bg-warning text-dark">&nbsp;</span> Próximo servicio (&lt; 1000 km / días)</span>
+          <span class="me-3"><span class="badge bg-info text-dark">&nbsp;</span> Servicio próximo (&lt; 500 km / días)</span>
+          <span><span class="badge bg-success">&nbsp;</span> Mantenimiento al día</span>
         </div>
 
         <!-- Tabs -->
         <ul class="nav nav-tabs border-0 mt-3">
           <li class="nav-item">
-            <a class="nav-link active" data-bs-toggle="tab" href="#tab-horas">
-              Por HORAS <span class="badge bg-secondary" id="badgeHoras">0</span>
-            </a>
-          </li>
-          <li class="nav-item">
-            <a class="nav-link" data-bs-toggle="tab" href="#tab-km">
-              Por KM <span class="badge bg-secondary" id="badgeKm">0</span>
+            <a class="nav-link active" data-bs-toggle="tab" href="#tab-km">
+              Plan por KM (principal) <span class="badge bg-secondary" id="badgeKm">0</span>
             </a>
           </li>
           <li class="nav-item">
             <a class="nav-link" data-bs-toggle="tab" href="#tab-tiempo">
-              Por TIEMPO <span class="badge bg-secondary" id="badgeTiempo">0</span>
+              Por TIEMPO (calendario) <span class="badge bg-secondary" id="badgeTiempo">0</span>
+            </a>
+          </li>
+          <li class="nav-item">
+            <a class="nav-link" data-bs-toggle="tab" href="#tab-horas">
+              Por HORAS de uso <span class="badge bg-secondary" id="badgeHoras">0</span>
             </a>
           </li>
         </ul>
@@ -100,48 +115,22 @@
 
       <div class="card-body">
         <div class="tab-content">
-          <!-- ===== Tabla: Por HORAS ===== -->
-          <div class="tab-pane fade show active" id="tab-horas">
-            <div class="table-responsive">
-              <table class="table table-hover align-middle">
-                <thead class="table-light">
-                  <tr>
-                    <th style="min-width:220px">Vehículo o Equipo</th>
-                    <th>N° OT</th>
-                    <th>Fecha inicio tareas</th>
-                    <th>KM en fecha inicio</th>
-                    <th>Horas realizadas</th>
-                    <th>KM realizados</th>
-                    <th>Promedios diarios</th>
-                    <th>Niveles</th>
-                    <th>Fecha estimada</th>
-                    <th>Faltan (días)</th>
-                    <th>Faltan (horas)</th>
-                    <th></th>
-                  </tr>
-                </thead>
-                <tbody id="tbodyHoras">
-                  <tr><td colspan="15" class="text-center text-muted">Sin datos</td></tr>
-                </tbody>
-              </table>
-            </div>
-          </div>
 
-          <!-- ===== Tabla: Por KM ===== -->
-          <div class="tab-pane fade" id="tab-km">
+          <!-- ===== Tabla: Plan por KM (principal) ===== -->
+          <div class="tab-pane fade show active" id="tab-km">
             <div class="table-responsive">
               <table class="table table-hover align-middle">
                 <thead class="table-light">
                   <tr>
                     <th>Vehículo</th>
-                    <th>N° OT</th>
-                    <th>Fecha inicio</th>
-                    <th>KM inicio</th>
-                    <th>KM realizados</th>
-                    <th>Promedios diarios</th>
-                    <th>Niveles</th>
-                    <th>Fecha estimada</th>
-                    <th>Faltan (km)</th>
+                    <th>Servicio / N° ref.</th>
+                    <th>KM base<br><small class="text-muted">al último mantenimiento</small></th>
+                    <th>KM actual</th>
+                    <th>KM recorridos<br><small class="text-muted">desde último servicio</small></th>
+                    <th>Uso promedio<br><small class="text-muted">km / día</small></th>
+                    <th>KM faltantes<br><small class="text-muted">para próximo servicio</small></th>
+                    <th>Fecha estimada<br><small class="text-muted">próximo mantenimiento</small></th>
+                    <th>Prioridad</th>
                     <th></th>
                   </tr>
                 </thead>
@@ -159,10 +148,10 @@
                 <thead class="table-light">
                   <tr>
                     <th>Vehículo</th>
-                    <th>N° OT</th>
-                    <th>Última MP cerrada</th>
-                    <th>Fecha estimada</th>
-                    <th>Faltan (días)</th>
+                    <th>Servicio / N° ref.</th>
+                    <th>Último mantenimiento registrado</th>
+                    <th>Fecha estimada próximo servicio</th>
+                    <th>Días faltantes</th>
                     <th>Estado</th>
                     <th></th>
                   </tr>
@@ -173,16 +162,50 @@
               </table>
             </div>
           </div>
+
+          <!-- ===== Tabla: Por HORAS de uso ===== -->
+          <div class="tab-pane fade" id="tab-horas">
+            <div class="table-responsive">
+              <table class="table table-hover align-middle">
+                <thead class="table-light">
+                  <tr>
+                    <th style="min-width:220px">Vehículo o equipo</th>
+                    <th>Servicio / N° ref.</th>
+                    <th>Fecha inicio control</th>
+                    <th>KM en inicio</th>
+                    <th>Horas acumuladas</th>
+                    <th>KM recorridos</th>
+                    <th>Promedio diario<br><small class="text-muted">horas / día</small></th>
+                    <th>Prioridad</th>
+                    <th>Fecha estimada</th>
+                    <th>Horas faltantes</th>
+                    <th></th>
+                  </tr>
+                </thead>
+                <tbody id="tbodyHoras">
+                  <tr><td colspan="11" class="text-center text-muted">Sin datos</td></tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+
         </div>
       </div>
 
       <!-- Pie -->
       <div class="card-footer">
         <div class="row g-2 small">
-          <div class="col-12 col-md">
-            <span class="fw-semibold">ALERTAS (texto en color rojo):</span>
-            <span class="ms-2">FECHA INICIO TAREAS → Hace más de 6 meses que no se hacen OT MP</span>
-            <span class="ms-3">Última HR → Hace más de 1 semana que no se ingresan HR</span>
+          <div class="col-12">
+            <span class="fw-semibold">Interpretación general:</span>
+            <span class="ms-2">
+              filas en <span class="badge bg-danger">&nbsp;</span> indican que el mantenimiento está
+              <b>vencido</b> (se superó el km o la fecha estimada).
+            </span>
+            <span class="ms-2">
+              filas en <span class="badge bg-warning text-dark">&nbsp;</span> o
+              <span class="badge bg-info text-dark">&nbsp;</span> señalan
+              <b>servicios próximos</b> según los km/día del vehículo.
+            </span>
           </div>
         </div>
       </div>
@@ -191,77 +214,133 @@
   </div>
 </div>
 
-<!-- ===== JS funcional ===== -->
+{% endblock %}
+{% block script %}
 <script>
-// Helpers
-const $ = (sel, ctx=document) => ctx.querySelector(sel);
-const $$ = (sel, ctx=document) => Array.from(ctx.querySelectorAll(sel));
-const fmt = (n, d=1) => (n==null? '—' : Number(n).toLocaleString('es-PE', {minimumFractionDigits:d, maximumFractionDigits:d}));
+// ===== Datos de ejemplo para el módulo de mantenimiento =====
+const MOCK_MANTENIMIENTO = {
+  default: {
+    cabecera: {
+      placa: 'C7R-891',
+      modelo: 'Moto carguera de reparto',
+      km_inicio: 10250,          // km al último mantenimiento registrado
+      nro_ot: 'MP-0001',         // referencia de mantenimiento preventivo
+      fecha_inicio: '2025-11-10' // fecha de inicio de seguimiento
+    },
+    // Plan principal por KM
+    por_km: [
+      {
+        descripcion: 'Cambio de aceite motor',
+        km_actual: 10268,           // km actual
+        km_faltantes: 232,          // km restantes para el próximo servicio
+        fecha_estimada: '2025-12-05',
+        promedio_diario: 6.5,       // km/día
+        nivel_mp: 'Media'
+      },
+      {
+        descripcion: 'Revisión general chasis',
+        km_actual: 10300,
+        km_faltantes: 700,
+        fecha_estimada: '2026-01-15',
+        promedio_diario: 7.2,
+        nivel_mp: 'Baja'
+      }
+    ],
+    // Plan por TIEMPO
+    por_tiempo: [
+      {
+        descripcion: 'Inspección sistema de frenos',
+        ultima_mp_cerrada: '2025-10-20',
+        fecha_estimada: '2025-12-10',
+        faltan_dias: 23,
+        estado: 'Programado'
+      }
+    ],
+    // Plan por HORAS de uso
+    por_horas: [
+      {
+        descripcion: 'Revisión uso urbano (rutas cortas)',
+        horas_realizadas: 6.5,
+        horas_faltantes: 13.5,
+        fecha_estimada: '2025-11-30',
+        promedio_diario: 1.1,
+        nivel_mp: 'Baja'
+      }
+    ],
+    // Configuración de vencimientos
+    alertas_conf: {
+      seguro_venc:    '2026-03-15',
+      tecnica_venc:   '2025-12-30',
+      ruta_venc:      '2025-12-01',
+      matafuego_venc: '2025-11-25'
+    }
+  }
+};
 
-// Formateo de fecha robusto: acepta 'YYYY-MM-DD' o fecha serializada
+// ===== Helpers generales =====
+const $  = (sel, ctx=document) => ctx.querySelector(sel);
+const $$ = (sel, ctx=document) => Array.from(ctx.querySelectorAll(sel));
+
+const fmt = (n, d=1) =>
+  (n == null || n === '' ? '—'
+   : Number(n).toLocaleString('es-PE', { minimumFractionDigits:d, maximumFractionDigits:d }));
+
 function fmtDateSafe(s) {
   if (!s) return '';
-  // Si ya viene como 'YYYY-MM-DD...' lo devolvemos tal cual
   const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(String(s));
   if (m) return `${m[1]}-${m[2]}-${m[3]}`;
-  // Si viene como 'Fri, 12 Sep 2025 00:00:00 GMT' u otro, parseamos
   const d = new Date(s);
   if (isNaN(d.getTime())) return '';
-  const y = d.getFullYear();
-  const mm = String(d.getMonth()+1).padStart(2,'0');
-  const dd = String(d.getDate()).padStart(2,'0');
+  const y  = d.getFullYear();
+  const mm = String(d.getMonth() + 1).padStart(2, '0');
+  const dd = String(d.getDate()).padStart(2, '0');
   return `${y}-${mm}-${dd}`;
 }
 
-// estado visual por faltantes
 function badgeHtml(value) {
   if (value == null || isNaN(value)) return '<span class="badge bg-secondary">—</span>';
   const v = Number(value);
-  if (v < 0) return `<span class="badge bg-danger">${v}</span>`;
-  if (v < 50) return `<span class="badge bg-info">${v}</span>`;
-  if (v < 100) return `<span class="badge bg-warning text-dark">${v}</span>`;
-  return `<span class="badge bg-secondary">${v}</span>`;
-}
-// Crear OT rápida
-async function crearOT(vehiculoId){
-  const nro = prompt('N° de OT (ej. OT-0001):');
-  if(!nro) return;
-  const res = await fetch('/api/mantenimiento/ot', {
-    method:'POST', headers:{'Content-Type':'application/json'},
-    credentials:'same-origin',
-    body: JSON.stringify({ vehiculo_id: vehiculoId, nro_ot: nro, niveles: null })
-  });
-  const j = await res.json();
-  if(j.ok){ alert('OT creada'); loadUI(vehiculoId); }
-  else{ alert('No se pudo crear la OT'); }
+  if (v < 0)    return `<span class="badge bg-danger">${v}</span>`;              // vencido
+  if (v < 500)  return `<span class="badge bg-info text-dark">${v}</span>`;     // muy próximo
+  if (v < 1000) return `<span class="badge bg-warning text-dark">${v}</span>`;  // próximo
+  return `<span class="badge bg-success">${v}</span>`;                          // con holgura
 }
 
-// Guardar vencimientos/alertas por vehículo
-async function guardarAlertas(vehiculoId){
-  const payload = {
-    seguro_venc:    $('#seguroVenc').value || null,
-    tecnica_venc:   $('#tecnicaVenc').value || null,
-    ruta_venc:      $('#rutaVenc').value || null,
-    matafuego_venc: $('#matafuegoVenc').value || null
-  };
-  const res = await fetch(`/api/mantenimiento/${vehiculoId}/alertas_conf`, {
-    method:'POST', headers:{'Content-Type':'application/json'},
-    credentials:'same-origin', body: JSON.stringify(payload)
-  });
-  const j = await res.json();
-  if(j.ok){
-    // Recalcular alertas y recargar UI (esto vuelve a setear las fechas)
-    await fetch(`/api/mantenimiento/${vehiculoId}/alertas/disparar`, {method:'POST', credentials:'same-origin'});
-    await loadUI(vehiculoId);
-    alert('Alertas guardadas');
-  } else {
-    alert('Error guardando alertas');
-  }
+const rowClass = (falt) => {
+  if (falt == null || isNaN(falt)) return '';
+  const v = Number(falt);
+  if (v < 0)    return 'table-danger';
+  if (v < 500)  return 'table-info';
+  if (v < 1000) return 'table-warning';
+  return '';
+};
+
+const toNum = (v, def = 0) => (v == null || v === '' ? def : Number(v) || def);
+
+const firstNonEmpty = (obj, keys = [], fallback = []) => {
+  for (const k of keys) if (Array.isArray(obj?.[k]) && obj[k].length) return obj[k];
+  return fallback;
+};
+
+const pick = (o, keys, def = '—') => {
+  for (const k of keys) if (o?.[k] != null && o[k] !== '') return o[k];
+  return def;
+};
+
+// ===== Acciones de mantenimiento (solo vista; sin BD) =====
+function crearOT(vehiculoId) {
+  const nro = prompt('Referencia del mantenimiento (ej. MP-0002):');
+  if (!nro) return;
+  alert('Mantenimiento registrado.');
 }
 
-// Filtros simples (placa)
+function guardarAlertas(vehiculoId) {
+  alert('Vencimientos actualizados.');
+}
+
+// ===== Filtro por placa =====
 function filtrarPorPlaca() {
-  const txt = ($('#filtroPlaca').value || '').trim().toLowerCase();
+  const txt = ($('#filtroPlaca')?.value || '').trim().toLowerCase();
   const sel = $('#vehiculoSelect');
   const options = $$('#vehiculoSelect option');
   options.forEach(op => {
@@ -269,169 +348,166 @@ function filtrarPorPlaca() {
     op.hidden = !show;
   });
   const first = options.find(op => !op.hidden);
-  if(first) sel.value = first.value;
+  if (first) sel.value = first.value;
 }
 
+// ===== Carga inicial =====
 document.addEventListener('DOMContentLoaded', () => {
   const sel = $('#vehiculoSelect');
-  if (sel.value) loadUI(sel.value);
-  sel.addEventListener('change', e => loadUI(e.target.value));
-  $('#btnBuscar').addEventListener('click', filtrarPorPlaca);
-  $('#btnLimpiar').addEventListener('click', () => {
-    $('#filtroPlaca').value=''; $('#filtroNumVeh').value=''; $('#filtroNumEq').value='';
-    $$('#vehiculoSelect option').forEach(op => op.hidden=false);
-  });
-  $('#btnGuardarAlertas').addEventListener('click', () => guardarAlertas(sel.value));
-  $('#btnDisparar').addEventListener('click', () => fetch(`/api/mantenimiento/${sel.value}/alertas/disparar`, {method:'POST', credentials:'same-origin'}).then(()=>loadUI(sel.value)));
-});
-</script>
 
-<script>
-async function loadUI(vehiculoId) {
-  const $ = (sel, ctx=document) => ctx.querySelector(sel);
-  const $$ = (sel, ctx=document) => Array.from(ctx.querySelectorAll(sel));
-  const fmt = (n, d=1) => (n==null || n==='') ? '—' : Number(n).toLocaleString('es-PE',{minimumFractionDigits:d,maximumFractionDigits:d});
-  const toNum = (v, def=0) => (v==null || v==='') ? def : Number(v)||def;
-  const fmtDateSafe = (s) => {
-    if (!s) return '';
-    const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(String(s));
-    if (m) return `${m[1]}-${m[2]}-${m[3]}`;
-    const d = new Date(s);
-    if (isNaN(d.getTime())) return '';
-    const y = d.getFullYear(), mm = String(d.getMonth()+1).padStart(2,'0'), dd = String(d.getDate()).padStart(2,'0');
-    return `${y}-${mm}-${dd}`;
-  };
-  const badgeHtml = (value) => {
-    if (value == null || isNaN(value)) return '<span class="badge bg-secondary">—</span>';
-    const v = Number(value);
-    if (v < 0) return `<span class="badge bg-danger">${v}</span>`;
-    if (v < 50) return `<span class="badge bg-info">${v}</span>`;
-    if (v < 100) return `<span class="badge bg-warning text-dark">${v}</span>`;
-    return `<span class="badge bg-secondary">${v}</span>`;
-  };
-  const rowClass = (falt) => (falt<0)?'table-danger':(falt<50)?'table-info':(falt<100)?'table-warning':'';
+  if (sel && sel.value) loadUI(sel.value);
 
-  // Utilidades para tolerar variaciones del backend
-  const firstNonEmpty = (obj, keys=[], fallback=[]) => {
-    for (const k of keys) if (Array.isArray(obj?.[k]) && obj[k].length) return obj[k];
-    return fallback;
-  };
-  const pick = (o, keys, def='—') => {
-    for (const k of keys) if (o?.[k] != null && o[k] !== '') return o[k];
-    return def;
-  };
-
-  $('#vehInfo').textContent = `ID ${vehiculoId}`;
-  const res = await fetch(`/api/mantenimiento/${vehiculoId}/ui`, {credentials:'same-origin'});
-  const { ok, data } = await res.json();
-  if (!ok) return;
-
-  // ===== Alertas (vencimientos)
-  $('#seguroVenc').value    = fmtDateSafe(data?.alertas_conf?.seguro_venc);
-  $('#tecnicaVenc').value   = fmtDateSafe(data?.alertas_conf?.tecnica_venc);
-  $('#rutaVenc').value      = fmtDateSafe(data?.alertas_conf?.ruta_venc);
-  $('#matafuegoVenc').value = fmtDateSafe(data?.alertas_conf?.matafuego_venc);
-
-  // Cabecera común
-  const cab = data?.cabecera ?? {};
-  const placa   = pick(cab, ['placa','placa_vehiculo','placaVehiculo'],'');
-  const modelo  = pick(cab, ['modelo','modelo_vehiculo'],'');
-  const nroOT   = pick(cab, ['nro_ot','nroOT','num_ot','numero_ot'],'—');
-  const finicio = pick(cab, ['fecha_inicio_tareas','fechaInicioTareas','fecha_inicio','fec_inicio'], null);
-
-  // ===================== HORAS =====================
-// ===================== HORAS =====================
-const horasList = firstNonEmpty(data, ['por_horas','porHoras','horas','mp_horas'], []);
-const tbodyHoras = document.querySelector('#tbodyHoras');
-const horasRows = horasList.map(i => {
-  const horasReal = toNum(pick(i, ['horas_realizadas','horasRealizadas','hrs_realizadas','hrs'], 0), 0);
-  const kmInicio  = toNum(pick(cab, ['km_inicio','odometro_inicio','kmInicio'], 0), 0);
-  const kmReal    = toNum(pick(cab, ['km_realizados','kmAcumulados'], 0), 0);
-  const promDia   = toNum(pick(i, ['promedio_diario','promedioDiario'], NaN), NaN);
-  const nivel     = pick(i, ['nivel','niveles','nivel_mp'],'—');
-  const faltHoras = toNum(pick(i, ['horas_faltantes','faltan_horas','faltante_horas'], NaN), NaN);
-  const fechaEst  = pick(i, ['fecha_estimada','fecha_proxima','proxima_fecha','fec_estimada'], null);
-
-  return `
-    <tr class="${rowClass(faltHoras)}">
-      <td><div class="fw-semibold">${placa} &nbsp; ${modelo}</div><div class="text-muted small">(Vehículo)</div></td>
-      <td>${nroOT}</td>
-      <td>${finicio ? new Date(finicio).toLocaleString() : '—'}</td>
-      <td>${fmt(kmInicio,0)}</td>
-      <td>${fmt(horasReal,1)}</td>
-      <td>${fmt(kmReal,0)}</td>
-      <td>${isNaN(promDia) ? '—' : fmt(promDia,1)}</td>
-      <td>${nivel}</td>
-      <td>${fmtDateSafe(fechaEst) || '—'}</td>
-      <td>—</td>
-      <td>${badgeHtml(faltHoras)}</td>
-      <td><button class="btn btn-outline-primary btn-sm" onclick="crearOT(${vehiculoId})">Crear OT MP</button></td>
-    </tr>`;
-});
-
-  document.querySelector('#badgeHoras').textContent = horasRows.length;
-  tbodyHoras.innerHTML = horasRows.length ? horasRows.join('') :
-    `<tr><td colspan="15" class="text-center text-muted">Sin datos</td></tr>`;
-
-  // ======================= KM =======================
-  // Soporta: por_km, porKM, km, mp_km
-  const kmList = firstNonEmpty(data, ['por_km','porKM','km','mp_km'], []);
-  if (!kmList.length && (data?.por_km || data?.porKM || data?.km || data?.mp_km)) {
-    console.warn('Se detectó clave de KM pero llegó vacía. Data:', data);
+  if (sel) {
+    sel.addEventListener('change', e => loadUI(e.target.value));
   }
-  const tbodyKm = document.querySelector('#tbodyKm');
-  const kmRows = kmList.map(i => {
-    const kmInicio   = toNum(pick(cab, ['km_inicio','odometro_inicio','kmInicio'], 0), 0);
-    const kmReal     = toNum(pick(i, ['km_realizados','kmAcumulados','km','km_actual'], 0), 0);
-    const faltKm     = toNum(pick(i, ['km_faltantes','faltan_km','faltante_km','faltanteKm'], NaN), NaN);
-    const nivel      = pick(i, ['nivel','niveles','nivel_mp'],'—');
-    const fechaEst   = pick(i, ['fecha_estimada','fecha_proxima','proxima_fecha','fec_estimada'],'—');
-    const promDia    = pick(i, ['promedio_diario','promedioDiario','km_dia'],'—');
+
+  $('#btnBuscar')?.addEventListener('click', filtrarPorPlaca);
+
+  $('#btnLimpiar')?.addEventListener('click', () => {
+    const inp = $('#filtroPlaca');
+    if (inp) inp.value = '';
+    $$('#vehiculoSelect option').forEach(op => op.hidden = false);
+  });
+
+  $('#btnGuardarAlertas')?.addEventListener('click', () => {
+    if (!sel || !sel.value) return;
+    guardarAlertas(sel.value);
+  });
+
+  $('#btnDisparar')?.addEventListener('click', () => {
+    if (sel && sel.value) loadUI(sel.value);
+  });
+});
+
+// ===== Cargar información de mantenimiento =====
+function loadUI(vehiculoId) {
+  const data = MOCK_MANTENIMIENTO[vehiculoId] || MOCK_MANTENIMIENTO.default;
+
+  $('#vehInfo').textContent =
+    `Seguimiento de mantenimiento por kilometraje del vehículo ${data.cabecera.placa}.`;
+
+  // Alertas (vencimientos)
+  $('#seguroVenc').value    = fmtDateSafe(data.alertas_conf.seguro_venc);
+  $('#tecnicaVenc').value   = fmtDateSafe(data.alertas_conf.tecnica_venc);
+  $('#rutaVenc').value      = fmtDateSafe(data.alertas_conf.ruta_venc);
+  $('#matafuegoVenc').value = fmtDateSafe(data.alertas_conf.matafuego_venc);
+
+  // Cabecera
+  const cab      = data.cabecera || {};
+  const placa    = pick(cab, ['placa'], '');
+  const modelo   = pick(cab, ['modelo'], '');
+  const nroOT    = pick(cab, ['nro_ot'], '—');
+  const finicio  = pick(cab, ['fecha_inicio'], null);
+  const kmInicio = toNum(pick(cab, ['km_inicio'], 0), 0);
+
+  // ===== POR KM =====
+  const kmList  = firstNonEmpty(data, ['por_km'], []);
+  const tbodyKm = $('#tbodyKm');
+  const kmRows  = kmList.map(i => {
+    const kmActual      = toNum(pick(i, ['km_actual','km_realizados'], 0), 0);
+    const kmRecorridos  = kmActual - kmInicio;
+    const faltKm        = toNum(pick(i, ['km_faltantes'], NaN), NaN);
+    const nivel         = pick(i, ['nivel','niveles','nivel_mp'],'—');
+    const fechaEst      = pick(i, ['fecha_estimada'], '—');
+    const promDia       = toNum(pick(i, ['promedio_diario'], NaN), NaN);
+    const descServicio  = pick(i, ['descripcion'], 'Servicio programado');
+
     return `
       <tr class="${rowClass(faltKm)}">
         <td>${placa}</td>
-        <td>${nroOT}</td>
-        <td>${finicio ? new Date(finicio).toLocaleString() : '—'}</td>
-        <td>${fmt(kmInicio,0)}</td>
-        <td>${fmt(kmReal,0)}</td>
-        <td>${fmt(promDia,1)}</td>
-        <td>${nivel}</td>
-        <td>${fmtDateSafe(fechaEst) || '—'}</td>
+        <td>${descServicio}<br><small class="text-muted">Ref: ${nroOT}</small></td>
+        <td>${fmt(kmInicio,0)}<br><small class="text-muted">Km al último mantenimiento</small></td>
+        <td>${fmt(kmActual,0)}</td>
+        <td>${fmt(kmRecorridos,0)}</td>
+        <td>${isNaN(promDia) ? '—' : fmt(promDia,1)}</td>
         <td>${badgeHtml(faltKm)}</td>
-        <td><button class="btn btn-outline-primary btn-sm" onclick="crearOT(${vehiculoId})">Crear OT MP</button></td>
+        <td>${fmtDateSafe(fechaEst) || '—'}</td>
+        <td>${nivel}</td>
+        <td>
+          <button class="btn btn-outline-primary btn-sm"
+                  onclick="crearOT(${vehiculoId})">
+            Registrar mantenimiento
+          </button>
+        </td>
       </tr>`;
   });
-  document.querySelector('#badgeKm').textContent = kmRows.length;
-  tbodyKm.innerHTML = kmRows.length ? kmRows.join('') :
-    `<tr><td colspan="10" class="text-center text-muted">Sin datos</td></tr>`;
 
-  // ===================== TIEMPO =====================
-  // Soporta: por_tiempo, porTiempo, tiempo, mp_tiempo
-  const tiempoList = firstNonEmpty(data, ['por_tiempo','porTiempo','tiempo','mp_tiempo'], []);
-  if (!tiempoList.length && (data?.por_tiempo || data?.porTiempo || data?.tiempo || data?.mp_tiempo)) {
-    console.warn('Se detectó clave de TIEMPO pero llegó vacía. Data:', data);
-  }
-  const tbodyTiempo = document.querySelector('#tbodyTiempo');
-  const tiempoRows = tiempoList.map(i => {
-    const ultimaCerrada = fmtDateSafe(pick(i, ['ultima_mp_cerrada','fecha_inicio','fecha_ultima','ultimaCerrada'],''));
-    const fechaEst      = fmtDateSafe(pick(i, ['fecha_estimada','fecha_proxima','proxima_fecha','fec_estimada'],''));
-    const faltDias      = toNum(pick(i, ['faltan_dias','dias_faltantes','faltante_dias','faltantes'], NaN), NaN);
-    const estado        = pick(i, ['estado','estado_mp','status'],'—');
+  $('#badgeKm').textContent = kmRows.length;
+  tbodyKm.innerHTML = kmRows.length
+    ? kmRows.join('')
+    : `<tr><td colspan="10" class="text-center text-muted">Sin datos</td></tr>`;
+
+  // ===== POR TIEMPO =====
+  const tiempoList  = firstNonEmpty(data, ['por_tiempo'], []);
+  const tbodyTiempo = $('#tbodyTiempo');
+  const tiempoRows  = tiempoList.map(i => {
+    const ultimaCerrada = fmtDateSafe(pick(i, ['ultima_mp_cerrada'], ''));
+    const fechaEst      = fmtDateSafe(pick(i, ['fecha_estimada'], ''));
+    const faltDias      = toNum(pick(i, ['faltan_dias'], NaN), NaN);
+    const estado        = pick(i, ['estado'],'—');
+    const descServicio  = pick(i, ['descripcion'], 'Servicio programado');
+
     return `
       <tr class="${rowClass(faltDias)}">
         <td>${placa}</td>
-        <td>${nroOT}</td>
+        <td>${descServicio}<br><small class="text-muted">Ref: ${nroOT}</small></td>
         <td>${ultimaCerrada || '—'}</td>
         <td>${fechaEst || '—'}</td>
         <td>${badgeHtml(faltDias)}</td>
         <td>${estado}</td>
-        <td><button class="btn btn-outline-primary btn-sm" onclick="crearOT(${vehiculoId})">Crear OT MP</button></td>
+        <td>
+          <button class="btn btn-outline-primary btn-sm"
+                  onclick="crearOT(${vehiculoId})">
+            Registrar mantenimiento
+          </button>
+        </td>
       </tr>`;
   });
-  document.querySelector('#badgeTiempo').textContent = tiempoRows.length;
-  tbodyTiempo.innerHTML = tiempoRows.length ? tiempoRows.join('') :
-    `<tr><td colspan="7" class="text-center text-muted">Sin datos</td></tr>`;
+
+  $('#badgeTiempo').textContent = tiempoRows.length;
+  tbodyTiempo.innerHTML = tiempoRows.length
+    ? tiempoRows.join('')
+    : `<tr><td colspan="7" class="text-center text-muted">Sin datos</td></tr>`;
+
+  // ===== POR HORAS =====
+  const horasList  = firstNonEmpty(data, ['por_horas'], []);
+  const tbodyHoras = $('#tbodyHoras');
+  const horasRows  = horasList.map(i => {
+    const horasReal     = toNum(pick(i, ['horas_realizadas'], 0), 0);
+    const promDiaHoras  = toNum(pick(i, ['promedio_diario'], NaN), NaN);
+    const faltHoras     = toNum(pick(i, ['horas_faltantes'], NaN), NaN);
+    const nivel         = pick(i, ['nivel','niveles','nivel_mp'],'—');
+    const fechaEst      = pick(i, ['fecha_estimada'], null);
+    const descServicio  = pick(i, ['descripcion'], 'Control por horas de uso');
+
+    return `
+      <tr class="${rowClass(faltHoras)}">
+        <td>
+          <div class="fw-semibold">${placa} ${modelo}</div>
+          <div class="text-muted small">${descServicio}</div>
+        </td>
+        <td>${nroOT}</td>
+        <td>${finicio ? new Date(finicio).toLocaleString() : '—'}</td>
+        <td>${fmt(kmInicio,0)}</td>
+        <td>${fmt(horasReal,1)}</td>
+        <td>${fmt(kmInicio + 30,0)}</td>
+        <td>${isNaN(promDiaHoras) ? '—' : fmt(promDiaHoras,1)}</td>
+        <td>${nivel}</td>
+        <td>${fmtDateSafe(fechaEst) || '—'}</td>
+        <td>${badgeHtml(faltHoras)}</td>
+        <td>
+          <button class="btn btn-outline-primary btn-sm"
+                  onclick="crearOT(${vehiculoId})">
+            Registrar mantenimiento
+          </button>
+        </td>
+      </tr>`;
+  });
+
+  $('#badgeHoras').textContent = horasRows.length;
+  tbodyHoras.innerHTML = horasRows.length
+    ? horasRows.join('')
+    : `<tr><td colspan="11" class="text-center text-muted">Sin datos</td></tr>`;
 }
 </script>
-
 {% endblock %}

@@ -194,6 +194,22 @@
                             </a>
                         </li>
 
+                        <!-- Nuevo submenú: Sensores -> Registro de temperatura y humedad -->
+                            <li class="sidebar-item">
+                                <a class="sidebar-link collapsed" data-bs-toggle="collapse" href="#sensoresSubmenu" aria-expanded="false">
+                                    <i class="align-middle" data-feather="activity"></i>
+                                    <span class="align-middle">Sensores</span>
+                                </a>
+                                <ul id="sensoresSubmenu" class="sidebar-dropdown list-unstyled collapse">
+                                    <li class="sidebar-item">
+                                        <a class="sidebar-link" href="{{ url_for('registro_temperatura_humedad') }}">
+                                            <i class="align-middle" data-feather="cloud"></i>
+                                            <span class="align-middle">Registro temp. y humedad</span>
+                                        </a>
+                                    </li>
+                                </ul>
+                            </li>
+
                     </ul>
                 </div>
             </nav>

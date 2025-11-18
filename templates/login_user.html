@@ -4,15 +4,19 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+
+  <!-- Alertify (notificaciones) -->
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/alertifyjs@1.13.1/build/css/alertify.min.css">
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/alertifyjs@1.13.1/build/css/themes/default.min.css">
   <script src="https://cdn.jsdelivr.net/npm/alertifyjs@1.13.1/build/alertify.min.js"></script>
   <script>
-    alertify.set('notifier', 'position', 'top-right'); // arriba
+    alertify.set('notifier', 'position', 'top-right');
   </script>
 
   <title>Iniciar sesión</title>
+
   <style>
+    /* --- estilos principales --- */
     * {
       box-sizing: border-box;
       margin: 0;
@@ -165,72 +169,95 @@
 
 <body>
   <div class="container">
-    <div class="left"></div>
+    <div class="left" aria-hidden="true"></div>
+
     <div class="right">
       <h2 class="titulo-movil">Iniciar Sesión</h2>
-      <form method="POST" action="/procesar_login">
+
+      <!-- FORMULARIO: sin CSRF -->
+      <form method="POST" action="/procesar_login" novalidate>
         <div class="form-group">
           <label for="dni_usuario">DNI</label>
           <input type="text" name="dni_usuario" id="dni_usuario" placeholder="Ingresa tu DNI" required
             inputmode="numeric" pattern="\d{8}" maxlength="8" autocomplete="off" />
-          
         </div>
+
         <div class="form-group">
           <label for="password">Contraseña</label>
           <input type="password" name="password" id="password" placeholder="Ingresa tu contraseña" required />
         </div>
+
         <button type="submit">Iniciar Sesión</button>
       </form>
     </div>
   </div>
-</body>
-<script>
-  const rolNombre = "{{ session['rol'] | safe }}";
-  const rolId = "{{ session['rol_id'] | safe }}";
 
-  if (rolNombre && rolNombre !== 'None') {
-    localStorage.setItem("rol_usuario", rolNombre);
-    localStorage.setItem("rol_id", rolId);
-    console.log("✅ Rol guardado en localStorage:", rolNombre, "(ID:", rolId, ")");
-  }
-</script>
-<script>
-  const form = document.querySelector('form[action="/procesar_login"]');
-  const dniInput = document.getElementById('dni_usuario');
+  <!-- JS: guardar rol en localStorage si existe en sesión (safe escaping) -->
+  <script>
+    (function () {
+      const rolNombre = {{ session.get('rol') | tojson | default ('null')
+    }};
+    const rolId = {{ session.get('rol_id') | tojson | default ('null') }};
 
-  // permitir solo dígitos al tipear/pegar
-  dniInput.addEventListener('input', () => {
-    dniInput.value = dniInput.value.replace(/\D+/g, '').slice(0, 8);
-  });
-
-  form.addEventListener('submit', (e) => {
-    const dni = dniInput.value.trim();
-    if (!/^\d{8}$/.test(dni)) {
-      e.preventDefault();
-      alertify.error('El DNI debe tener 8 dígitos numéricos.');
-      dniInput.focus();
-      return;
+    if (rolNombre && rolNombre !== 'None') {
+      try {
+        localStorage.setItem("rol_usuario", rolNombre);
+        localStorage.setItem("rol_id", rolId);
+        console.log("✅ Rol guardado en localStorage:", rolNombre, "(ID:", rolId, ")");
+      } catch (e) {
+        console.warn("No se pudo guardar rol en localStorage:", e);
+      }
     }
-  });
-</script>
-<script>
-  {% with msgs = get_flashed_messages(with_categories=true) %}
-    {% if msgs %}
-      {% for category, message in msgs %}
-        {% if category in ['error','danger'] %}
-          alertify.error("{{ message|e }}");
-        {% elif category in ['success'] %}
-          alertify.success("{{ message|e }}");
-        {% else %}
-          alertify.message("{{ message|e }}");
-        {% endif %}
-      {% endfor %}
-    {% endif %}
-  {% endwith %}
-</script>
+    }) ();
+  </script>
 
+  <!-- JS: Validación DNI y manejo del formulario -->
+  <script>
+    (function () {
+      const form = document.querySelector('form[action="/procesar_login"]');
+      const dniInput = document.getElementById('dni_usuario');
 
+      if (dniInput) {
+        // permitir solo dígitos al tipear/pegar
+        dniInput.addEventListener('input', () => {
+          dniInput.value = dniInput.value.replace(/\D+/g, '').slice(0, 8);
+        });
+      }
 
+      if (form) {
+        form.addEventListener('submit', (e) => {
+          const dni = (dniInput && dniInput.value || '').trim();
+          if (!/^\d{8}$/.test(dni)) {
+            e.preventDefault();
+            alertify.error('El DNI debe tener 8 dígitos numéricos.');
+            dniInput.focus();
+            return;
+          }
+        });
+      }
+    })();
+  </script>
+  <!-- JS: mostrar mensajes flash (server → cliente) -->
+  <script>
+    (function () {
+      // Jinja renderiza un array de pares [category, message]
+      const flashed = {{ get_flashed_messages(with_categories = true) | tojson
+    }};
 
+    if (!Array.isArray(flashed)) return;
+
+    flashed.forEach(([category, message]) => {
+      if (['error', 'danger'].includes(category)) {
+        alertify.error(message);
+      } else if (category === 'success') {
+        alertify.success(message);
+      } else {
+        alertify.message(message);
+      }
+    });
+  }) ();
+  </script>
+
+</body>
 
 </html>

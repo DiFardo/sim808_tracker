@@ -384,7 +384,7 @@
       return;
     }
     if (!/^\d{8}$/.test(dni)) {
-      alertify.message("🔎 DNI inválido: deben ser 8 dígitos.");
+      alertify.message("DNI inválido: deben ser 8 dígitos.");
       return;
     }
 
@@ -407,8 +407,6 @@
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload)
       });
-
-      // Intenta leer JSON incluso si es 4xx/5xx
       let data = null;
       try { data = await res.json(); } catch { data = { success:false, message: await res.text() }; }
 
@@ -420,13 +418,11 @@
         setTimeout(() => location.reload(), 800);
         return;
       }
-
-      // Errores controlados por API o 4xx
       const msg = (data && data.message) ? data.message : "Error al registrar/actualizar.";
       if (esErrorDniDuplicado(msg)) {
-        alertify.message("🚫 DNI duplicado: ya existe un usuario con ese documento");
+        alertify.message("DNI duplicado: ya existe un usuario con ese documento");
       } else {
-        alertify.error("❌ " + msg);
+        alertify.error(" " + msg);
       }
     } catch (err) {
       console.error(err);
@@ -533,8 +529,6 @@
 </script>
 
 <!-- JS de Alertify.js -->
-<script src="https://cdn.jsdelivr.net/npm/alertifyjs@1.13.1/build/alertify.min.js"></script>
-
 
 
 {% endblock %}

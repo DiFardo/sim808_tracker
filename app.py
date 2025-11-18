@@ -1,5 +1,5 @@
-from flask import Flask, render_template, request, redirect, flash, make_response, url_for, jsonify 
-from flask_jwt_extended import JWTManager, create_access_token, set_access_cookies, unset_jwt_cookies, jwt_required, get_jwt_identity, exceptions
+from flask import Flask, render_template, request, Blueprint, redirect, flash, make_response, url_for, jsonify 
+from flask_jwt_extended import JWTManager,  create_access_token, set_access_cookies, unset_jwt_cookies, jwt_required, get_jwt_identity, exceptions, verify_jwt_in_request
 import hashlib
 import os
 from datetime import timedelta
@@ -11,7 +11,7 @@ import controladores.controlador_index as controlador_index
 import controladores.controlador_permisos as controlador_permisos
 import controladores.controlador_mantenimiento as controlador_mantenimiento
 import controladores.controlador_mantenimiento as cm
-
+from flask_wtf import CSRFProtect
 from controladores.controlador_permisos import obtener_permisos_rol, tiene_permiso
 from controladores.controlador_index import obtener_flotas_estado, obtener_conductores_en_ruta, dias_con_mas_rutas, obtener_rutas_hoy, obtener_vehiculos_en_ruta, obtener_conductores_activos_con_asignacion
 from werkzeug.security import check_password_hash
@@ -35,26 +35,35 @@ import logging
 
 
 
-
-
 app = Flask(__name__, static_url_path='/static', static_folder='static')
-from flask_jwt_extended import JWTManager
-app.secret_key = 'super-secret'
+
+app.config['SECRET_KEY'] = os.environ.get('FLASK_SECRET_KEY', 'super-secret-dev-key-change-in-prod')
+
+app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'
+app.config['SESSION_COOKIE_SECURE'] = False  
 app.config['JWT_TOKEN_LOCATION'] = ['cookies']
-app.config['JWT_COOKIE_SECURE'] = False 
+app.config['JWT_COOKIE_SECURE'] = False  # True en producción con HTTPS
 app.config['JWT_ACCESS_COOKIE_NAME'] = 'access_token_cookie'
+app.config['JWT_COOKIE_CSRF_PROTECT'] = False
+
 app.config['JWT_ACCESS_TOKEN_EXPIRES'] = timedelta(hours=2)
-app.config['JWT_COOKIE_CSRF_PROTECT'] = False  
 app.url_map.strict_slashes = False
+jwt = JWTManager(app)
+
 def tiene_permiso(permisos, id_modulo=None, id_opcion=None):
     for p in permisos:
         if ((id_modulo is None or p[0] == id_modulo) and
             (id_opcion is None or p[2] == id_opcion) and
-            p[4] == True):  # p[4] representa el campo 'permiso'
+            p[4] == True):
             return True
     return False
+
 app.jinja_env.globals.update(tiene_permiso=tiene_permiso)
-jwt = JWTManager(app)
+
+
+
+
+# Resto de tus rutas (sin cambios funcionales)
 @app.route('/verificar-conexion')
 def verificar_conexion():
     try:
@@ -63,14 +72,17 @@ def verificar_conexion():
         return jsonify({"estado": "exitoso", "mensaje": "Conexión a la base de datos establecida correctamente."}), 200
     except Exception as e:
         return jsonify({"estado": "error", "mensaje": str(e)}), 500
+
 def dni_valido(d: str) -> bool:
     return d.isdigit() and len(d) == 8
+
 @app.route("/")
 @app.route("/login_user")
 def login():
     resp = make_response(render_template("login_user.html"))
-    unset_jwt_cookies(resp) 
+    unset_jwt_cookies(resp)
     return resp
+
 @app.route("/procesar_login", methods=["POST"])
 def procesar_login():
     try:
@@ -107,7 +119,6 @@ def procesar_login():
     except Exception as e:
         flash(f"Ocurrió un error: {str(e)}", "error")
         return redirect("/login_user")
-
 
 
 
@@ -183,6 +194,8 @@ def api_roles():
     roles = controlador_usuarios.obtener_roles_activos()
     roles_json = [{"id": r["id"], "nombre": r["nombre"]} for r in roles]
     return jsonify(roles_json)
+
+
 @app.route("/api/permisos-rol/<int:id_rol>")
 @jwt_required()
 def api_permisos_rol(id_rol):
@@ -1232,15 +1245,51 @@ def historial_rutas():
         {"name": "Historial de Rutas", "url": url_for("historial_rutas")}
     ]
 
-    # Tabla (ya la tienes)
+    # =========================
+    # 1) DATOS PARA LA TABLA
+    # =========================
+    # OJO: ajusta rp.destino al nombre real de tu columna de destino (texto)
     q_tabla = """
     SELECT
       rp.id AS id_ruta,
+
       NULLIF(TRIM(COALESCE(p.nombre,'') || ' ' || COALESCE(p.apellido,'')), '') AS conductor_raw,
-      COALESCE(CONCAT(v.modelo, ' - ', v.placa), '') AS vehiculo_raw,
-      COALESCE(arc.fecha_asignacion::text, rp.fecha::text) AS fecha_asignacion_raw,
-      rp.hora_llegada::text AS fecha_llegada_raw,
-      COALESCE(arc.estado, 'Activa') AS estado_raw
+      COALESCE(CONCAT(v.modelo, ' - ', v.placa), '')                             AS vehiculo_raw,
+
+      -- Fecha/hora de ASIGNACIÓN como timestamp
+      COALESCE(arc.fecha_asignacion, rp.fecha::timestamp)                         AS fecha_asignacion_ts,
+      TO_CHAR(COALESCE(arc.fecha_asignacion, rp.fecha::timestamp),
+              'YYYY-MM-DD HH24:MI')                                               AS fecha_asignacion_raw,
+
+      -- Fecha/hora de LLEGADA: combinamos fecha + hora_llegada
+      CASE
+        WHEN rp.hora_llegada IS NOT NULL THEN
+          (rp.fecha::timestamp + rp.hora_llegada)
+        ELSE NULL
+      END                                                                         AS fecha_llegada_ts,
+      CASE
+        WHEN rp.hora_llegada IS NOT NULL THEN
+          TO_CHAR(rp.fecha::timestamp + rp.hora_llegada, 'YYYY-MM-DD HH24:MI')
+        ELSE NULL
+      END                                                                         AS fecha_llegada_raw,
+
+      COALESCE(arc.estado, 'Activa')                                             AS estado_raw,
+
+      -- DESTINO TEXTO (cambia rp.destino por tu campo real, si se llama distinto)
+      rp.destino::text                                                           AS destino_raw,
+
+      -- Minutos de recorrido = llegada_ts - asignacion_ts
+      CASE
+        WHEN rp.hora_llegada IS NOT NULL THEN
+          EXTRACT(
+            EPOCH FROM (
+              (rp.fecha::timestamp + rp.hora_llegada)
+              - COALESCE(arc.fecha_asignacion, rp.fecha::timestamp)
+            )
+          ) / 60
+        ELSE NULL
+      END                                                                         AS minutos_recorrido
+
     FROM rutas_programadas rp
     LEFT JOIN asignacion_ruta_conductor arc ON arc.id_ruta = rp.id
     LEFT JOIN personas p  ON p.id = arc.id_persona
@@ -1248,7 +1297,9 @@ def historial_rutas():
     ORDER BY rp.fecha DESC, rp.id DESC;
     """
 
-    # Marcadores para el mapa (última ubicación o el origen)
+    # =========================
+    # 2) MARCADORES (por si los usas luego)
+    # =========================
     q_marcadores = """
     SELECT
       rp.id AS id_ruta,
@@ -1272,36 +1323,115 @@ def historial_rutas():
     ORDER BY rp.fecha DESC, rp.id DESC;
     """
 
+    # =========================
+    # 3) RUTAS HISTÓRICAS (para azul/roja)
+    # =========================
+    # Ajusta rp.destino_lat / rp.destino_lon a tus nombres reales si los tienes
+    q_rutas_historicas = """
+    SELECT
+      rp.id          AS id_ruta,
+      rp.origen_lat  AS origen_lat,
+      rp.origen_lon  AS origen_lon,
+      rp.destino_lat AS destino_lat,
+      rp.destino_lon AS destino_lon,
+      u.lat          AS punto_lat,
+      u.lon          AS punto_lon,
+      u.hora         AS hora_punto
+    FROM rutas_programadas rp
+    LEFT JOIN ubicaciones_ruta u
+      ON u.id_ruta = rp.id
+    ORDER BY rp.id, u.hora;
+    """
+
     con = obtener_conexion()
     cur = con.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
 
-    # Tabla
+    # ---------- Tabla ----------
     cur.execute(q_tabla)
     rows = cur.fetchall()
     recorridos = []
+
     for r in rows:
+        # Tiempo recorrido
+        minutos = r["minutos_recorrido"]
+        if minutos is None:
+            tiempo_str = "—"
+        else:
+            minutos = int(round(minutos))
+            if minutos < 60:
+                tiempo_str = f"{minutos} min"
+            else:
+                h = minutos // 60
+                m = minutos % 60
+                tiempo_str = f"{h} h {m} min" if m else f"{h} h"
+
+        # Fechas (ya vienen como texto en formato bonito)
+        fecha_asig_str = r["fecha_asignacion_raw"] or ""
+        fecha_lleg_str = r["fecha_llegada_raw"] or ""
+
         recorridos.append({
-            "conductor": r["conductor_raw"] or "Sin asignar",
-            "vehiculo":  r["vehiculo_raw"] or "Sin asignar",
-            "fecha_asignacion": r["fecha_asignacion_raw"] or "",
-            "fecha_llegada":    r["fecha_llegada_raw"] or "",
+            "id_ruta":          r["id_ruta"],
+            "conductor":        r["conductor_raw"] or "Sin asignar",
+            "vehiculo":         r["vehiculo_raw"] or "Sin asignar",
+            "fecha_asignacion": fecha_asig_str,
+            "fecha_llegada":    fecha_lleg_str,
             "estado":           r["estado_raw"] or "Activa",
+            "destino":          r["destino_raw"] or "",
+            "tiempo_recorrido": tiempo_str,
         })
 
-    # Marcadores
+    # ---------- Marcadores ----------
     cur.execute(q_marcadores)
     conductor_markers = cur.fetchall()
 
-    cur.close(); con.close()
+    # ---------- Rutas históricas ----------
+    cur.execute(q_rutas_historicas)
+    puntos = cur.fetchall()
+
+    rutas_dict = {}
+    for p in puntos:
+        rid = p["id_ruta"]
+        if rid not in rutas_dict:
+            rutas_dict[rid] = {
+                "id_ruta": rid,
+                "origen": {
+                    "lat": float(p["origen_lat"]) if p["origen_lat"] is not None else None,
+                    "lng": float(p["origen_lon"]) if p["origen_lon"] is not None else None,
+                },
+                "destino": {
+                    "lat": float(p["destino_lat"]) if p["destino_lat"] is not None else None,
+                    "lng": float(p["destino_lon"]) if p["destino_lon"] is not None else None,
+                },
+                "real": []  # trayecto real (puntos rojos)
+            }
+
+        if p["punto_lat"] is not None and p["punto_lon"] is not None:
+            rutas_dict[rid]["real"].append({
+                "lat": float(p["punto_lat"]),
+                "lng": float(p["punto_lon"]),
+            })
+
+    # Si no hay destino_lat/lon pero sí puntos, usamos el último punto como destino
+    for rid, data in rutas_dict.items():
+        if (data["destino"]["lat"] is None or data["destino"]["lng"] is None) and data["real"]:
+            last = data["real"][-1]
+            data["destino"]["lat"] = last["lat"]
+            data["destino"]["lng"] = last["lng"]
+
+    rutas_historicas = list(rutas_dict.values())
+
+    cur.close()
+    con.close()
 
     return render_template(
         "historial_rutas.html",
         usuario=usuario,
         breadcrumbs=breadcrumbs,
         recorridos=recorridos,
-        conductor_markers=conductor_markers  # <<--- para el mapa
+        conductor_markers=conductor_markers,  # por si luego lo usas
+        rutas_historicas=rutas_historicas     # 🔵🔴 para el mapa
     )
-# ruta para mantenimiento 
+
 
 # ========== VISTA ==========
 @app.route("/mantenimiento")
@@ -1362,18 +1492,31 @@ def api_cerrar_ot(ot_id):
     cm.cerrar_ot(ot_id)
     return jsonify({"ok": True})
 
-# ========== API: sensores (push) ==========
 @app.route("/api/sensores/push", methods=["POST"])
-@jwt_required()
 def api_push_sensor():
-    j = request.get_json() or {}
-    vehiculo_id = int(j.get("vehiculo_id"))
-    clave = str(j.get("clave"))             # p.ej. "vibracion_motor"
-    valor = float(j.get("valor"))
-    cm.insertar_lectura_sensor(vehiculo_id, clave, valor)
-    # Opcional: disparar predictivo al vuelo
-    cm.disparar_alertas_predictivas(vehiculo_id)
-    return jsonify({"ok": True})
+    try:
+        verify_jwt_in_request(optional=True)
+    except Exception:
+        pass
+    j = request.get_json(silent=True) or request.form or {}
+    try:
+        app.logger.debug("api_push_sensor payload: %s", j)
+
+        vehiculo_id = int(j.get("vehiculo_id"))
+        clave = str(j.get("clave"))             # p.ej. "vibracion_motor"
+        valor = float(j.get("valor"))
+    except Exception as e:
+        app.logger.exception("Payload inválido en api_push_sensor: %s", e)
+        return jsonify({"ok": False, "error": "Payload inválido"}), 400
+
+    try:
+        cm.insertar_lectura_sensor(vehiculo_id, clave, valor)
+        # Opcional: disparar predictivo al vuelo
+        cm.disparar_alertas_predictivas(vehiculo_id)
+        return jsonify({"ok": True})
+    except Exception as e:
+        app.logger.exception("Error insertando lectura sensor: %s", e)
+        return jsonify({"ok": False, "error": str(e)}), 500
 
 # ========== API: forzar disparo de alertas ==========
 @app.route("/api/mantenimiento/<int:vehiculo_id>/alertas/disparar", methods=["POST"])
@@ -1382,6 +1525,239 @@ def api_disparar_alertas(vehiculo_id):
     cm.disparar_alertas_preventivas(vehiculo_id)
     cm.disparar_alertas_predictivas(vehiculo_id)
     return jsonify({"ok": True})
+
+ROL_ADMIN_ID = 1  # Administrador
+ROL_CONDUCTOR_ID = 2  # ← ajusta si tu rol de conductor es otro
+
+def obtener_conductores():
+    """Devuelve personas activas con rol de conductor."""
+    con = obtener_conexion()
+    try:
+        with con.cursor() as cur:
+            cur.execute("""
+                SELECT id, nombre, apellido, dni
+                FROM personas
+                WHERE COALESCE(estado, TRUE) = TRUE
+                  AND COALESCE(eliminado, FALSE) = FALSE
+                  AND id_rol = %s
+                ORDER BY nombre, apellido
+            """, (ROL_CONDUCTOR_ID,))
+            rows = cur.fetchall()
+            # convierte a diccionarios simples
+            conductores = [
+                {"id": r[0], "nombre": r[1], "apellido": r[2], "dni": r[3]}
+                for r in rows
+            ]
+            return conductores
+    finally:
+        con.close()
+
+
+@app.route("/registro_temperatura_humedad")
+def registro_temperatura_humedad():
+    try:
+        verify_jwt_in_request(optional=True)
+        dni_usuario = get_jwt_identity()
+    except Exception:
+        dni_usuario = None
+
+    if not dni_usuario:
+        dni_usuario = session.get('dni_usuario')
+
+    usuario = controlador_usuarios.obtener_usuario(dni_usuario) if dni_usuario else None
+    puede_registrar = bool(usuario and int(usuario.get('rol_id') or 0) == ROL_ADMIN_ID)
+
+    breadcrumbs = [
+        {"name": "Inicio", "url": url_for("index")},
+        {"name": "Registro temp. y humedad", "url": url_for("registro_temperatura_humedad")}
+    ]
+
+    # Vehículos activos
+    try:
+        vehiculos_all = obtener_vehiculos()
+        vehiculos_activos = []
+        for v in vehiculos_all:
+            if isinstance(v, dict):
+                estado = v.get('estado', v.get('activo'))
+                if estado in (True, 'activo', 1, '1', 't', 'true') or estado is None:
+                    vehiculos_activos.append(v)
+            else:
+                vehiculos_activos.append(v)
+    except Exception as e:
+        vehiculos_activos = []
+        app.logger.exception("Error obteniendo vehículos: %s", e)
+
+    # Conductores (personas con rol conductor)
+    try:
+        conductores = obtener_conductores()
+    except Exception as e:
+        app.logger.exception("Error obteniendo conductores: %s", e)
+        conductores = []
+
+    return render_template(
+        "registro_temperatura_humedad.html",
+        usuario=usuario,
+        breadcrumbs=breadcrumbs,
+        vehiculos=vehiculos_activos,
+        conductores=conductores,          # ← PASAMOS CONDUCTORES
+        puede_registrar=puede_registrar
+    )
+
+
+bp_umbrales = Blueprint('umbrales', __name__)
+
+def _get_usuario_actual():
+    """Obtiene el usuario (DictRow) usando JWT o sesión."""
+    try:
+        verify_jwt_in_request(optional=True)
+        dni_usuario = get_jwt_identity()
+    except Exception:
+        dni_usuario = None
+    if not dni_usuario:
+        dni_usuario = session.get('dni_usuario')
+
+    # Import tardío para evitar ciclos
+    return controlador_usuarios.obtener_usuario(dni_usuario) if dni_usuario else None
+
+
+@app.route("/api/sensores/umbrales/guardar", methods=["POST"])
+def api_guardar_umbrales():
+    data = request.get_json(force=True)
+
+    aplicar_todos = bool(data.get('aplicar_todos'))
+    vehiculo_id   = data.get('vehiculo_id')
+    temp_min      = data.get('temp_min')
+    temp_max      = data.get('temp_max')
+    rh_min        = data.get('rh_min')
+    rh_max        = data.get('rh_max')
+
+    # Validaciones
+    for k in ('temp_min','temp_max','rh_min','rh_max'):
+        if data.get(k) is None:
+            return jsonify({"message": f"Campo {k} es obligatorio"}), 400
+    try:
+        tmin = float(temp_min); tmax = float(temp_max)
+        hmin = float(rh_min);   hmax = float(rh_max)
+    except Exception:
+        return jsonify({"message": "Valores numéricos inválidos"}), 400
+    if tmin >= tmax: return jsonify({"message":"Temp Min debe ser < Temp Max"}), 400
+    if hmin >= hmax: return jsonify({"message":"RH Min debe ser < RH Max"}), 400
+
+    # Usuario / solo Admin
+    try:
+        verify_jwt_in_request(optional=True); dni_usuario = get_jwt_identity()
+    except Exception:
+        dni_usuario = None
+    if not dni_usuario:
+        dni_usuario = session.get('dni_usuario')
+
+    usuario = controlador_usuarios.obtener_usuario(dni_usuario) if dni_usuario else None
+    if not usuario:
+        return jsonify({"message":"Sesión no válida"}), 401
+    if int(usuario.get('rol_id') or 0) != ROL_ADMIN_ID:
+        return jsonify({"message":"Solo el Administrador puede registrar umbrales"}), 403
+
+    persona_id = usuario.get('persona_id')
+    if not persona_id:
+        return jsonify({"message":"No se encontró persona asociada"}), 400
+
+    con = obtener_conexion()
+    try:
+        with con.cursor() as cur:
+            # ===== CORRECCIÓN AQUÍ =====
+            if aplicar_todos:
+                cur.execute("""
+                    SELECT id
+                    FROM vehiculos
+                    WHERE COALESCE(estado, TRUE) = TRUE
+                """)
+                ids = [r[0] for r in cur.fetchall()]
+                if not ids:
+                    return jsonify({"message":"No hay vehículos activos para aplicar"}), 400
+            else:
+                if not vehiculo_id:
+                    return jsonify({"message":"vehiculo_id requerido cuando no es masivo"}), 400
+                ids = [int(vehiculo_id)]
+            # ===========================
+
+            # Upsert sin ON CONFLICT
+            upd_sql = """
+                UPDATE sensores_umbrales
+                   SET temp_min = %s,
+                       temp_max = %s,
+                       rh_min   = %s,
+                       rh_max   = %s,
+                       persona_id = %s,
+                       actualizado_en = NOW()
+                 WHERE vehiculo_id = %s
+            """
+            ins_sql = """
+                INSERT INTO sensores_umbrales
+                    (vehiculo_id, temp_min, temp_max, rh_min, rh_max, persona_id, actualizado_en)
+                VALUES
+                    (%s, %s, %s, %s, %s, %s, NOW())
+            """
+            afectados = 0
+            for vid in ids:
+                cur.execute(upd_sql, (tmin, tmax, hmin, hmax, persona_id, vid))
+                if cur.rowcount == 0:
+                    cur.execute(ins_sql, (vid, tmin, tmax, hmin, hmax, persona_id))
+                afectados += 1
+
+        con.commit()
+        return jsonify({"message":"Umbrales guardados correctamente", "vehiculos_afectados": afectados}), 200
+
+    except Exception as e:
+        con.rollback()
+        return jsonify({"message":"Error al guardar umbrales", "detail": str(e)}), 500
+    finally:
+        con.close()
+
+# === LEER UMBRALES POR VEHÍCULO (GET) ===
+
+@app.route("/api/sensores/umbrales/<int:vehiculo_id>", methods=["GET"])
+def api_obtener_umbrales_por_id(vehiculo_id: int):
+    """
+    Devuelve los umbrales guardados para un vehículo.
+    Respuesta:
+      200: {"umbrales": {"vehiculo_id": X, "temp_min": ..., "temp_max": ..., "rh_min": ..., "rh_max": ...}}
+      404: {"message": "No hay umbrales para este vehículo"}
+    """
+    con = obtener_conexion()
+    try:
+        with con.cursor() as cur:
+            cur.execute("""
+                SELECT temp_min, temp_max, rh_min, rh_max
+                FROM sensores_umbrales
+                WHERE vehiculo_id = %s
+                LIMIT 1
+            """, (vehiculo_id,))
+            row = cur.fetchone()
+            if not row:
+                return jsonify({"message": "No hay umbrales para este vehículo"}), 404
+
+            # row por posición porque usamos SELECT explícito en orden conocido
+            umbrales = {
+                "vehiculo_id": vehiculo_id,
+                "temp_min": float(row[0]),
+                "temp_max": float(row[1]),
+                "rh_min":   float(row[2]),
+                "rh_max":   float(row[3]),
+            }
+            return jsonify({"umbrales": umbrales}), 200
+    except Exception as e:
+        app.logger.exception("Error al obtener umbrales")
+        return jsonify({"message": "Error al obtener umbrales", "detail": str(e)}), 500
+    finally:
+        con.close()
+
+
+# Ruta alternativa por compatibilidad con el frontend (mismo resultado)
+@app.route("/api/sensores/umbrales/vehiculo/<int:vehiculo_id>", methods=["GET"])
+def api_obtener_umbrales_por_id_alt(vehiculo_id: int):
+    return api_obtener_umbrales_por_id(vehiculo_id)
+
+
 
 
 if __name__ == "__main__":

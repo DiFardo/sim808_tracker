@@ -1,0 +1,528 @@
+{% extends "pagina_maestra.html" %}
+
+{% block titulo %}Temperatura y humedad{% endblock %}
+
+{% block link %}
+<link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css" rel="stylesheet">
+<link href="{{ url_for('static', filename='css/custom.css') }}" rel="stylesheet">
+<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+<link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
+<link rel="stylesheet" href="{{ url_for('static', filename='css/app.css') }}">
+<link rel="stylesheet" href="//cdn.jsdelivr.net/npm/alertifyjs@1.13.1/build/css/alertify.min.css" />
+<link rel="stylesheet" href="//cdn.jsdelivr.net/npm/alertifyjs@1.13.1/build/css/themes/default.min.css" />
+{% endblock %}
+
+{% block contenido %}
+<div id="content">
+  <div class="main-content">
+    <h4>Configuración de umbrales por vehículo</h4>
+
+    <div class="row g-3 align-items-end">
+      <div class="col-md-6">
+        <label for="vehiculoSel" class="form-label">Vehículo</label>
+        <select id="vehiculoSel" class="form-select">
+          {% for v in vehiculos %}
+          <option value="{{ v.id }}">{{ v.placa or v.alias or ('Vehículo ' ~ v.id) }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="col-md-6">
+        <div class="form-check mt-4">
+          <input class="form-check-input" type="checkbox" id="chkTodos">
+          <label class="form-check-label" for="chkTodos">
+            Aplicar a <b>todos</b> los vehículos
+          </label>
+        </div>
+      </div>
+    </div>
+
+    {% if puede_registrar %}
+    <div class="row g-3 mt-2">
+      <div class="col-md-6">
+        <h6>Temperatura (°C)</h6>
+        <div class="input-group mb-2">
+          <span class="input-group-text">Min</span>
+          <input id="tempMin" type="number" step="0.1" class="form-control" min="-100" max="100">
+          <span class="input-group-text">Max</span>
+          <input id="tempMax" type="number" step="0.1" class="form-control" min="-100" max="100">
+        </div>
+      </div>
+
+      <div class="col-md-6">
+        <h6>Humedad (%RH)</h6>
+        <div class="input-group mb-2">
+          <span class="input-group-text">Min</span>
+          <input id="rhMin" type="number" step="0.1" class="form-control" min="0" max="100">
+          <span class="input-group-text">Max</span>
+          <input id="rhMax" type="number" step="0.1" class="form-control" min="0" max="100">
+        </div>
+      </div>
+    </div>
+
+    <div class="d-flex gap-2">
+      <button id="btnPreset" class="btn btn-outline-info">
+        Validación predeterminada (pescado congelado)
+      </button>
+      <button id="btnGuardar" class="btn btn-primary">Guardar Umbrales</button>
+    </div>
+    <small class="text-muted d-block mt-2">
+      Referencia: estabilidad a −18 °C y HR ≈ 95 % (spo.nmfs.noaa.gov).
+    </small>
+    {% else %}
+    <div class="alert alert-info mt-3">
+      Vista informativa. No cuentas con permisos para registrar umbrales.
+    </div>
+    {% endif %}
+
+    <hr>
+
+    <!-- ============================
+         SECCIÓN: Captura de panel (OCR)
+         ============================ -->
+    <div class="card shadow-sm mb-4">
+      <div class="card-body">
+        <div class="d-flex align-items-center justify-content-between mb-2">
+          <h5 class="mb-0">Captura de panel (OCR)</h5>
+          <span class="badge rounded-pill text-bg-secondary">Diseño UI</span>
+        </div>
+
+        <div class="row g-3">
+          <div class="col-lg-4">
+            <label for="vehiculoOCRSel" class="form-label">Vehículo</label>
+            <select id="vehiculoOCRSel" class="form-select">
+              {% for v in vehiculos %}
+              <option value="{{ v.id }}">{{ v.placa or v.alias or ('Vehículo ' ~ v.id) }}</option>
+              {% endfor %}
+            </select>
+          </div>
+
+          <div class="col-lg-8">
+            <label for="imagenPanel" class="form-label">Subir foto del panel</label>
+            <input id="imagenPanel" type="file" accept="image/*" class="form-control">
+            <div class="form-text">Sube una imagen nítida del display de temperatura y humedad.</div>
+          </div>
+
+          <div class="col-lg-4">
+            <div class="border rounded p-2 text-center">
+              <img id="previewImg" src="" alt="Preview" style="max-width:100%; display:none;">
+            </div>
+          </div>
+
+          <div class="col-lg-8">
+            <div class="row g-3">
+              <div class="col-sm-6">
+                <label class="form-label">Temperatura detectada (°C)</label>
+                <div class="input-group">
+                  <span class="input-group-text material-icons">device_thermostat</span>
+                  <input id="tempDetectada" type="number" step="0.1" class="form-control" placeholder="p.ej. -18.2">
+                </div>
+                <div class="form-text">Puede ser negativa (−) para congelados.</div>
+              </div>
+              <div class="col-sm-6">
+                <label class="form-label">Humedad detectada (%RH)</label>
+                <div class="input-group">
+                  <span class="input-group-text material-icons">water_drop</span>
+                  <input id="rhDetectada" type="number" step="0.1" min="0" max="100" class="form-control"
+                    placeholder="p.ej. 95.0">
+                </div>
+              </div>
+
+              <div class="col-sm-12 d-flex flex-wrap gap-2">
+                <button id="btnDetectarOCR" class="btn btn-success">
+                  Detectar con OCR
+                </button>
+                <button id="btnValidarRangos" class="btn btn-outline-primary">
+                  Validar contra umbrales
+                </button>
+                <button id="btnGuardarOCR" class="btn btn-primary" disabled>
+                  Guardar registro
+                </button>
+              </div>
+
+              <div class="col-sm-12">
+                <div id="pillEstado" class="mt-2" style="display:none;">
+                  <span class="badge rounded-pill text-bg-success me-2" id="pillOK" style="display:none;">Estable</span>
+                  <span class="badge rounded-pill text-bg-danger" id="pillKO" style="display:none;">Fuera de
+                    rango</span>
+                  <small class="text-muted ms-2" id="pillRecomendacion" style="display:none;"></small>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div> <!-- row -->
+
+      </div>
+    </div>
+
+    <!-- Tabla de resultados -->
+    <div class="card shadow-sm">
+      <div class="card-body">
+        <h6 class="mb-3">Resultados recientes</h6>
+        <div class="table-responsive">
+          <table class="table table-sm align-middle" id="tablaResultados">
+            <thead class="table-light">
+              <tr>
+                <th>Fecha/Hora</th>
+                <th>Conductor</th>
+                <th>Vehículo</th>
+                <th>Temperatura (°C)</th>
+                <th>Humedad (%RH)</th>
+                <th>Estado</th>
+                <th>Recomendación</th>
+              </tr>
+            </thead>
+            <tbody>
+              <!-- filas dinámicas -->
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <hr>
+    <div id="resultado" class="mt-3"></div>
+  </div>
+</div>
+
+<!-- Nombre del conductor (usuario actual) SOLO para vista -->
+<input type="hidden" id="nombreConductorCtx"
+       value="{% if usuario %}
+                {% if usuario.nombre_completo is defined and usuario.nombre_completo %}
+                  {{ usuario.nombre_completo }}
+                {% else %}
+                  {{ (usuario.nombres or '') ~ ' ' ~ (usuario.apellido_paterno or '') ~ ' ' ~ (usuario.apellido_materno or '') }}
+                {% endif %}
+              {% endif %}">
+{% endblock %}
+
+{% block script %}
+<script src="//cdn.jsdelivr.net/npm/alertifyjs@1.13.1/build/alertify.min.js"></script>
+
+<script>
+  // ---------- Alertify ----------
+  try {
+    alertify.set('notifier', 'position', 'top-right');
+    alertify.set('notifier', 'delay', 3);
+  } catch (_) { }
+
+  // 👉 Nombre del "conductor" SOLO para vista (usuario actual)
+  const NOMBRE_CONDUCTOR = (() => {
+    const input = document.getElementById('nombreConductorCtx');
+    if (!input) return '—';
+    const v = (input.value || '').trim();
+    return v !== '' ? v : '—';
+  })();
+
+  // ---------- Constantes y utilidades ----------
+  const T_MIN = -100, T_MAX = 100;   // °C
+  const H_MIN = 0, H_MAX = 100;      // %RH
+  const fmt2 = (n) => (Number.isFinite(n) ? n.toFixed(2) : '');
+  function dentroRango(v, a, b) { return Number.isFinite(v) && v >= a && v <= b; }
+
+  // Cache en memoria de umbrales por vehículo
+  const CACHE_UMBRALES = new Map();
+
+  // POST tolerante a respuestas no-JSON
+  async function postJSON(url, body) {
+    const r = await fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      credentials: 'include',
+      body: JSON.stringify(body)
+    });
+    const ct = (r.headers.get('content-type') || '').toLowerCase();
+    if (ct.includes('application/json')) {
+      return { ok: r.ok, status: r.status, data: await r.json() };
+    } else {
+      const raw = await r.text();
+      console.error('Respuesta NO JSON', { status: r.status, url: r.url, body: raw?.slice(0, 500) });
+      return { ok: r.ok, status: r.status, data: { message: raw } };
+    }
+  }
+
+  // GET umbrales por vehículo (intenta dos rutas por compatibilidad)
+  async function obtenerUmbrales(vehiculoId) {
+    if (!vehiculoId) throw new Error('vehiculoId requerido');
+    if (CACHE_UMBRALES.has(vehiculoId)) return CACHE_UMBRALES.get(vehiculoId);
+
+    let r = await fetch(`/api/sensores/umbrales/${vehiculoId}`, { credentials: 'include' });
+    if (!r.ok) {
+      r = await fetch(`/api/sensores/umbrales/vehiculo/${vehiculoId}`, { credentials: 'include' });
+    }
+    if (!r.ok) {
+      const msg = `No se pudo obtener umbrales (HTTP ${r.status}).`;
+      throw new Error(msg);
+    }
+    const data = await r.json();
+    const u = data.umbrales || data;
+    const tmin = parseFloat(u.temp_min), tmax = parseFloat(u.temp_max);
+    const hmin = parseFloat(u.rh_min),  hmax = parseFloat(u.rh_max);
+    if (![tmin, tmax, hmin, hmax].every(Number.isFinite)) {
+      throw new Error('El backend no devolvió umbrales válidos.');
+    }
+    const res = { tmin, tmax, hmin, hmax };
+    CACHE_UMBRALES.set(vehiculoId, res);
+    return res;
+  }
+
+  // ---------- Guardar umbrales ----------
+  const chkTodos = document.getElementById('chkTodos');
+  const selVehiculo = document.getElementById('vehiculoSel');
+  const btnGuardar = document.getElementById('btnGuardar');
+
+  if (chkTodos) {
+    chkTodos.addEventListener('change', () => {
+      selVehiculo.disabled = chkTodos.checked;
+    });
+  }
+
+  function validarRangos(tmin, tmax, hmin, hmax) {
+    if ([tmin, tmax, hmin, hmax].some(Number.isNaN)) {
+      alertify.message("📝 Completa todos los campos requeridos.");
+      return false;
+    }
+    if (tmin < T_MIN || tmax > T_MAX) {
+      alertify.error(`🌡️ Temperatura fuera de rango: permitido ${T_MIN} a ${T_MAX} °C.`);
+      return false;
+    }
+    if (hmin < H_MIN || hmax > H_MAX) {
+      alertify.error(`💧 Humedad fuera de rango: permitido ${H_MIN} a ${H_MAX} %RH.`);
+      return false;
+    }
+    if (tmin >= tmax) { alertify.error("🌡️ Temp Min debe ser menor que Temp Max."); return false; }
+    if (hmin >= hmax) { alertify.error("💧 RH Min debe ser menor que RH Max."); return false; }
+    return true;
+  }
+
+  function limpiarFormulario() {
+    const tminEl = document.getElementById('tempMin');
+    const tmaxEl = document.getElementById('tempMax');
+    const hminEl = document.getElementById('rhMin');
+    const hmaxEl = document.getElementById('rhMax');
+
+    if (tminEl) tminEl.value = '';
+    if (tmaxEl) tmaxEl.value = '';
+    if (hminEl) hminEl.value = '';
+    if (hmaxEl) hmaxEl.value = '';
+
+    if (chkTodos) chkTodos.checked = false;
+    if (selVehiculo) {
+      selVehiculo.disabled = false;
+      if (selVehiculo.options.length) selVehiculo.selectedIndex = 0;
+    }
+    alertify.message("Formulario listo para un nuevo registro.");
+    if (tminEl) tminEl.focus();
+  }
+
+  const btnPreset = document.getElementById('btnPreset');
+  if (btnPreset) {
+    btnPreset.addEventListener('click', () => {
+      const preset = { tmin: -19.0, tmax: -17.0, hmin: 93.0, hmax: 97.0 };
+      document.getElementById('tempMin').value = preset.tmin;
+      document.getElementById('tempMax').value = preset.tmax;
+      document.getElementById('rhMin').value  = preset.hmin;
+      document.getElementById('rhMax').value  = preset.hmax;
+      alertify.success("✅ Preset aplicado: −18 °C (±1) y HR ~95 %.");
+    });
+  }
+
+  if (btnGuardar) {
+    btnGuardar.addEventListener('click', async () => {
+      const tmin = parseFloat(document.getElementById('tempMin').value);
+      const tmax = parseFloat(document.getElementById('tempMax').value);
+      const hmin = parseFloat(document.getElementById('rhMin').value);
+      const hmax = parseFloat(document.getElementById('rhMax').value);
+
+      if (!validarRangos(tmin, tmax, hmin, hmax)) return;
+
+      const body = {
+        aplicar_todos: !!(chkTodos && chkTodos.checked),
+        vehiculo_id: (chkTodos && chkTodos.checked) ? null : Number(selVehiculo.value),
+        temp_min: tmin, temp_max: tmax, rh_min: hmin, rh_max: hmax
+      };
+
+      btnGuardar.disabled = true;
+      try {
+        const resp = await postJSON('/api/sensores/umbrales/guardar', body);
+        if (resp.ok) {
+          alertify.success(resp.data?.message || "✅ Datos guardados correctamente.");
+          limpiarFormulario();
+          CACHE_UMBRALES.clear();
+        } else {
+          const msg = typeof resp.data?.message === 'string' ? resp.data.message : "Error al guardar";
+          alertify.error(`❌ ${msg}`);
+          console.error('Error guardar umbrales:', resp);
+        }
+      } catch (e) {
+        console.error('Fallo al guardar umbrales', e);
+        alertify.error('❌ No se pudo guardar.');
+      } finally {
+        btnGuardar.disabled = false;
+      }
+    });
+  }
+
+  // ---------- OCR: preview + detección simulada ----------
+  const imagenPanel = document.getElementById('imagenPanel');
+  if (imagenPanel) {
+    imagenPanel.addEventListener('change', (ev) => {
+      const f = ev.target.files && ev.target.files[0];
+      if (!f) return;
+      const url = URL.createObjectURL(f);
+      const img = document.getElementById('previewImg');
+      img.src = url; img.style.display = 'block';
+      alertify.message('Imagen cargada. Listo para detectar.');
+    });
+  }
+
+  const btnDetectar = document.getElementById('btnDetectarOCR');
+  function detectarDesdeImagenSimulada() {
+    const f = imagenPanel && imagenPanel.files && imagenPanel.files[0];
+    if (!f) { alertify.message("Sube una imagen primero."); return; }
+
+    const originalHTML = btnDetectar.innerHTML;
+    btnDetectar.disabled = true;
+    btnDetectar.innerHTML =
+      '<span class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span> Analizando...';
+
+    const delay = 1200 + Math.floor(Math.random() * 800);
+    setTimeout(() => {
+      const t = -18.0, h = 95.0;
+      document.getElementById('tempDetectada').value = t;
+      document.getElementById('rhDetectada').value  = h;
+      alertify.success(`OCR simulado: T=${fmt2(t)} °C, HR=${fmt2(h)} %`);
+      btnDetectar.disabled = false;
+      btnDetectar.innerHTML = originalHTML;
+    }, delay);
+  }
+  if (btnDetectar) btnDetectar.addEventListener('click', detectarDesdeImagenSimulada);
+
+  // ---------- Validación OCR vs umbrales guardados ----------
+  async function validarOCRvsUmbrales() {
+    const vehSel = document.getElementById('vehiculoOCRSel') || document.getElementById('vehiculoSel');
+    const vehiculoId = Number(vehSel && vehSel.value);
+    if (!vehiculoId) { alertify.message('Selecciona un vehículo.'); return; }
+
+    const t = parseFloat(document.getElementById('tempDetectada').value);
+    const h = parseFloat(document.getElementById('rhDetectada').value);
+
+    if (!Number.isFinite(t) || !Number.isFinite(h)) { alertify.message("Ingresa/Detecta temperatura y humedad."); return; }
+    if (t < T_MIN || t > T_MAX) { alertify.error(`Temperatura fuera de límites (${T_MIN} a ${T_MAX} °C).`); return; }
+    if (h < H_MIN || h > H_MAX) { alertify.error(`Humedad fuera de límites (${H_MIN} a ${H_MAX} %RH).`); return; }
+
+    let u;
+    try {
+      u = await obtenerUmbrales(vehiculoId);
+    } catch (e) {
+      console.error(e);
+      alertify.error('No hay umbrales registrados para este vehículo o no se pudieron obtener.');
+      return;
+    }
+
+    const estable = dentroRango(t, u.tmin, u.tmax) && dentroRango(h, u.hmin, u.hmax);
+
+    const pill = document.getElementById('pillEstado');
+    const pillOK = document.getElementById('pillOK');
+    const pillKO = document.getElementById('pillKO');
+    const pillRec = document.getElementById('pillRecomendacion');
+
+    if (pill) pill.style.display = 'block';
+    if (pillOK) pillOK.style.display = estable ? 'inline-block' : 'none';
+    if (pillKO) pillKO.style.display = estable ? 'none' : 'inline-block';
+
+    const rec = estable
+      ? "Puede dar orden de desembarcar producto."
+      : "Ajustar condiciones de conservación (revisar sellado, temperatura del equipo y tiempo de exposición).";
+
+    if (pillRec) {
+      pillRec.textContent =
+        `Recomendación: ${rec}  •  Umbrales: T ${fmt2(u.tmin)}–${fmt2(u.tmax)} °C | HR ${fmt2(u.hmin)}–${fmt2(u.hmax)} %`;
+      pillRec.style.display = 'inline';
+    }
+
+    const btnGuardarOCR = document.getElementById('btnGuardarOCR');
+    if (btnGuardarOCR) btnGuardarOCR.disabled = false;
+
+    alertify.success(estable ? "Estable dentro de umbrales." : "Fuera de rango.");
+  }
+  const btnValidar = document.getElementById('btnValidarRangos');
+  if (btnValidar) btnValidar.addEventListener('click', validarOCRvsUmbrales);
+
+  // ---------- Guardar fila en la tabla (SOLO VISTA) ----------
+  const btnGuardarOCR = document.getElementById('btnGuardarOCR');
+  if (btnGuardarOCR) {
+    btnGuardarOCR.addEventListener('click', async () => {
+      const t = parseFloat(document.getElementById('tempDetectada').value);
+      const h = parseFloat(document.getElementById('rhDetectada').value);
+
+      const vehSel = document.getElementById('vehiculoOCRSel') || document.getElementById('vehiculoSel');
+      const vehiculoId = Number(vehSel && vehSel.value);
+      const vehTxt = (vehSel && vehSel.options && vehSel.options[vehSel.selectedIndex] && vehSel.options[vehSel.selectedIndex].text)
+        ? vehSel.options[vehSel.selectedIndex].text
+        : (vehSel ? `Vehículo ${vehSel.value}` : 'Vehículo');
+
+      let estadoHTML = '<span class="badge text-bg-secondary">—</span>';
+      let rec = '—';
+      try {
+        const u = await obtenerUmbrales(vehiculoId);
+        const estable = dentroRango(t, u.tmin, u.tmax) && dentroRango(h, u.hmin, u.hmax);
+        estadoHTML = estable ? '<span class="badge text-bg-success">Estable</span>'
+                             : '<span class="badge text-bg-danger">Fuera de rango</span>';
+        rec = estable ? "Puede dar orden de desembarcar producto."
+                      : "Ajustar condiciones de conservación (revisar sellado, temperatura del equipo y tiempo de exposición).";
+      } catch (_) {
+        // Sin umbrales, deja valores por defecto
+      }
+
+      const conductor = NOMBRE_CONDUCTOR;  // usuario actual
+
+      const tr = document.createElement('tr');
+      const ahora = new Date();
+      tr.innerHTML = `
+        <td>${ahora.toLocaleString()}</td>
+        <td>${conductor}</td>
+        <td>${vehTxt}</td>
+        <td>${fmt2(t)}</td>
+        <td>${fmt2(h)}</td>
+        <td>${estadoHTML}</td>
+        <td>${rec}</td>
+      `;
+      const tbody = document.querySelector('#tablaResultados tbody');
+      if (tbody) tbody.prepend(tr);
+      alertify.success("Registro agregado en la tabla.");
+
+      // Limpieza visual de la sección OCR
+      const file = document.getElementById('imagenPanel');
+      if (file) file.value = '';
+      const img = document.getElementById('previewImg');
+      if (img) { img.src = ''; img.style.display = 'none'; }
+      const tInp = document.getElementById('tempDetectada');
+      const hInp = document.getElementById('rhDetectada');
+      if (tInp) tInp.value = '';
+      if (hInp) hInp.value = '';
+      if (btnGuardarOCR) btnGuardarOCR.disabled = true;
+
+      const pill = document.getElementById('pillEstado');
+      const pillOK = document.getElementById('pillOK');
+      const pillKO = document.getElementById('pillKO');
+      const pillRec = document.getElementById('pillRecomendacion');
+      if (pill) pill.style.display = 'none';
+      if (pillOK) pillOK.style.display = 'none';
+      if (pillKO) pillKO.style.display = 'none';
+      if (pillRec) pillRec.style.display = 'none';
+    });
+  }
+
+  // Prefetch opcional: al cambiar vehículo OCR, trae umbrales a cache
+  const selVehiculoOCR = document.getElementById('vehiculoOCRSel');
+  if (selVehiculoOCR) {
+    selVehiculoOCR.addEventListener('change', async (e) => {
+      const vid = Number(e.target.value);
+      if (!vid) return;
+      try { await obtenerUmbrales(vid); alertify.message('Umbrales del vehículo cargados.'); }
+      catch (_) { alertify.message('Este vehículo aún no tiene umbrales.'); }
+    });
+  }
+</script>
+
+{% endblock %}
