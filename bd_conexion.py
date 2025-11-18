@@ -1,10 +1,11 @@
-
 import psycopg2
-
 from dotenv import load_dotenv
 import os
 
-load_dotenv() 
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+ENV_PATH = os.path.join(BASE_DIR, ".env")
+
+load_dotenv(ENV_PATH)
 
 def obtener_conexion():
     return psycopg2.connect(
@@ -12,5 +13,5 @@ def obtener_conexion():
         port=os.getenv('POSTGRES_PORT'),
         user=os.getenv('POSTGRES_USER'),
         password=os.getenv('POSTGRES_PASSWORD'),
-        database=os.getenv('POSTGRES_DB')
+        dbname=os.getenv('POSTGRES_DB')
     )
